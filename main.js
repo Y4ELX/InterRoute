@@ -210,10 +210,18 @@ function drawRoute(coordinates, color, transportType) {
         opacity: 0.8
     };
     
-    // Solo aplicar curvas y estilos especiales para rutas aéreas
+    // Aplicar curvas para rutas aéreas y marítimas
     if (transportType === 'aerea') {
         routeCoordinates = createCurvedRoute(coordinates);
         polylineOptions.dashArray = '10, 5'; // Línea punteada para aviones
+        polylineOptions.weight = 3;
+    } else if (transportType === 'maritima') {
+        routeCoordinates = createMaritimeSpline(coordinates);
+        polylineOptions.weight = 4; // Línea más gruesa para rutas marítimas
+        polylineOptions.dashArray = '15, 5, 5, 5'; // Patrón dash-dot para rutas marítimas
+        polylineOptions.opacity = 0.9;
+    } else if (transportType === 'terrestre') {
+        polylineOptions.dashArray = '5, 10'; // Línea discontinua para terrestre
     }
     
     const polyline = L.polyline(routeCoordinates, polylineOptions).addTo(routeLayerGroup);
@@ -1040,6 +1048,92 @@ function createCurvedRoute(coordinates) {
     }
     
     return curvedPoints;
+}
+
+// Función para crear una curva spline suave para rutas marítimas
+function createMaritimeSpline(coordinates) {
+    console.log('createMaritimeSpline called with:', coordinates);
+    
+    if (coordinates.length < 2) return coordinates;
+    
+    // Si solo hay 2 puntos, crear una línea ligeramente curvada
+    if (coordinates.length === 2) {
+        const start = coordinates[0];
+        const end = coordinates[1];
+        
+        // Calcular punto medio con una ligera curvatura
+        const midLat = (start[0] + end[0]) / 2;
+        const midLng = (start[1] + end[1]) / 2;
+        
+        // Pequeña curvatura natural para rutas marítimas
+        const distance = Math.sqrt(
+            Math.pow(end[0] - start[0], 2) + 
+            Math.pow(end[1] - start[1], 2)
+        );
+        
+        const curvature = distance * 0.03; // Curvatura más sutil para rutas marítimas
+        const offsetLat = curvature * Math.sin(midLng * Math.PI / 180);
+        const offsetLng = curvature * Math.cos(midLat * Math.PI / 180);
+        
+        const result = [
+            start,
+            [midLat + offsetLat, midLng + offsetLng],
+            end
+        ];
+        
+        console.log('Simple maritime curve created:', result);
+        return result;
+    }
+    
+    // Para múltiples puntos, crear spline cúbico suave
+    const splinePoints = [];
+    const pointsPerSegment = 12; // Puntos por segmento optimizado para suavidad
+    
+    // Agregar el primer punto
+    splinePoints.push(coordinates[0]);
+    
+    // Crear spline entre cada par de puntos consecutivos
+    for (let i = 0; i < coordinates.length - 1; i++) {
+        const p0 = i > 0 ? coordinates[i - 1] : coordinates[i];
+        const p1 = coordinates[i];
+        const p2 = coordinates[i + 1];
+        const p3 = i < coordinates.length - 2 ? coordinates[i + 2] : coordinates[i + 1];
+        
+        // Calcular puntos intermedios usando spline cúbico
+        for (let t = 1; t <= pointsPerSegment; t++) {
+            const u = t / pointsPerSegment;
+            const point = catmullRomSpline(p0, p1, p2, p3, u);
+            splinePoints.push(point);
+        }
+    }
+    
+    console.log('Maritime spline created with', splinePoints.length, 'points');
+    return splinePoints;
+}
+
+// Función auxiliar para calcular spline Catmull-Rom optimizada para rutas marítimas
+function catmullRomSpline(p0, p1, p2, p3, t) {
+    const t2 = t * t;
+    const t3 = t2 * t;
+    
+    // Coeficientes para spline Catmull-Rom con tensión ajustada para rutas marítimas
+    const tension = 0.5; // Tensión del spline (0.5 es el estándar)
+    
+    const lat = tension * (
+        (2 * p1[0]) +
+        (-p0[0] + p2[0]) * t +
+        (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2 +
+        (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3
+    );
+    
+    const lng = tension * (
+        (2 * p1[1]) +
+        (-p0[1] + p2[1]) * t +
+        (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 +
+        (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3
+    );
+    
+    return [lat, lng];
 }
 
 // Inicialización cuando se carga la página

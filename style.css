@@ -117,22 +117,78 @@ button:hover {
 
 /* Estilos para marcadores de transporte */
 .transport-marker {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
+    text-align: center;
+    line-height: 30px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    border: 2px solid #1565c0;
+    font-size: 16px;
+    font-weight: bold;
 }
 
 .animated-marker {
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
-    animation: pulse 1s infinite;
+    animation: pulse 2s infinite;
 }
 
 @keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.2); }
-    100% { transform: scale(1); }
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.1);
+        opacity: 0.8;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* Estilos específicos para rutas marítimas */
+.maritime-route {
+    stroke: #0d47a1;
+    stroke-width: 4;
+    stroke-dasharray: 15, 5, 5, 5;
+    stroke-linecap: round;
+    opacity: 0.9;
+}
+
+.maritime-route:hover {
+    stroke-width: 6;
+    opacity: 1;
+}
+
+/* Estilos para rutas aéreas */
+.aerial-route {
+    stroke: #ff6f00;
+    stroke-width: 3;
+    stroke-dasharray: 10, 5;
+    stroke-linecap: round;
+    opacity: 0.8;
+}
+
+.aerial-route:hover {
+    stroke-width: 4;
+    opacity: 1;
+}
+
+/* Estilos para rutas terrestres */
+.terrestrial-route {
+    stroke: #2e7d32;
+    stroke-width: 4;
+    stroke-dasharray: 5, 10;
+    stroke-linecap: round;
+    opacity: 0.8;
+}
+
+.terrestrial-route:hover {
+    stroke-width: 5;
+    opacity: 1;
 }
 
 @media (max-width: 700px) {
