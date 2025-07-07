@@ -240,10 +240,25 @@
         // Función para calcular distancia total de una ruta
         function calculateRouteDistance(coordinates) {
             let totalDistance = 0;
-            for (let i = 0; i < coordinates.length - 1; i++) {
+            
+            // Convertir coordenadas a formato simple si tienen estructura de objeto
+            const normalizedCoords = coordinates.map(coord => {
+                if (typeof coord === 'object' && coord.coords) {
+                    // Es un punto estricto con formato {coords: [lat, lng], strict: true}
+                    return coord.coords;
+                } else if (Array.isArray(coord)) {
+                    // Es una coordenada normal [lat, lng]
+                    return coord;
+                } else {
+                    console.warn('Formato de coordenada no reconocido:', coord);
+                    return [0, 0];
+                }
+            });
+            
+            for (let i = 0; i < normalizedCoords.length - 1; i++) {
                 totalDistance += calculateDistance(
-                    coordinates[i][0], coordinates[i][1],
-                    coordinates[i+1][0], coordinates[i+1][1]
+                    normalizedCoords[i][0], normalizedCoords[i][1],
+                    normalizedCoords[i+1][0], normalizedCoords[i+1][1]
                 );
             }
             return totalDistance;
@@ -256,7 +271,8 @@
             'CHN': [35.8617, 104.1954],
             'GER': [51.1657, 10.4515],
             'JPN': [36.2048, 138.2529],
-            'NLD': [52.1326, 5.2913]
+            'NLD': [52.1326, 5.2913],
+            'KOR': [37.5665, 126.9780]
         };
 
         // Mapeo de códigos a nombres completos
@@ -266,7 +282,8 @@
             'CHN': 'China',
             'GER': 'Alemania',
             'JPN': 'Japón',
-            'NLD': 'Países Bajos'
+            'NLD': 'Países Bajos',
+            'KOR': 'Corea del Sur'
         };
 
         // Función para verificar si una ruta terrestre es geográficamente imposible
@@ -275,7 +292,7 @@
             const continentalGroups = {
                 'northAmerica': ['USA', 'MEX'],
                 'europe': ['GER', 'NLD'],
-                'asia': ['CHN', 'JPN']
+                'asia': ['CHN', 'JPN', 'KOR']
             };
             
             // Encontrar el grupo de cada país
@@ -303,15 +320,21 @@
                 ['MEX', 'GER'], ['GER', 'MEX'],
                 ['MEX', 'NLD'], ['NLD', 'MEX'],
                 ['MEX', 'JPN'], ['JPN', 'MEX'],
+                ['MEX', 'KOR'], ['KOR', 'MEX'],
                 ['USA', 'CHN'], ['CHN', 'USA'],
                 ['USA', 'GER'], ['GER', 'USA'],
                 ['USA', 'NLD'], ['NLD', 'USA'],
                 ['USA', 'JPN'], ['JPN', 'USA'],
+                ['USA', 'KOR'], ['KOR', 'USA'],
                 ['GER', 'CHN'], ['CHN', 'GER'],
                 ['GER', 'JPN'], ['JPN', 'GER'],
+                ['GER', 'KOR'], ['KOR', 'GER'],
                 ['NLD', 'CHN'], ['CHN', 'NLD'],
                 ['NLD', 'JPN'], ['JPN', 'NLD'],
-                ['CHN', 'JPN'], ['JPN', 'CHN'] // Separados por mar
+                ['NLD', 'KOR'], ['KOR', 'NLD'],
+                ['CHN', 'JPN'], ['JPN', 'CHN'], // Separados por mar
+                ['CHN', 'KOR'], ['KOR', 'CHN'], // Separados por mar
+                ['JPN', 'KOR'], ['KOR', 'JPN']  // Separados por mar
             ];
             
             return impossibleRoutes.some(route => 
@@ -370,8 +393,11 @@
                         // Las rutas marítimas deberían pasar por puertos
                         let hasPort = false;
                         coordinates.forEach(coord => {
+                            // Normalizar coordenada
+                            const normalizedCoord = typeof coord === 'object' && coord.coords ? coord.coords : coord;
+                            
                             // Verificar si está cerca de la costa (simplificado)
-                            if (Math.abs(coord[1]) > 0.5) { // Longitud no muy cercana a Greenwich
+                            if (Math.abs(normalizedCoord[1]) > 0.5) { // Longitud no muy cercana a Greenwich
                                 hasPort = true;
                             }
                         });
@@ -451,9 +477,32 @@
                 row.className = `route-${result.status}`;
                 
                 const routeName = `${countryNames[result.origin] || result.origin} → ${countryNames[result.destination] || result.destination}`;
-                const coordsStr = result.coordinates.map(coord => 
+                
+                // Normalizar coordenadas para mostrar
+                const normalizedCoords = result.coordinates.map(coord => {
+                    if (typeof coord === 'object' && coord.coords) {
+                        return coord.coords;
+                    } else if (Array.isArray(coord)) {
+                        return coord;
+                    } else {
+                        return [0, 0];
+                    }
+                });
+                
+                const coordsStr = normalizedCoords.map(coord => 
                     `[${coord[0].toFixed(2)}, ${coord[1].toFixed(2)}]`
                 ).join(', ');
+                
+                // Contar puntos estrictos
+                const strictPoints = result.coordinates.filter(coord => 
+                    typeof coord === 'object' && coord.strict
+                ).length;
+                
+                // Agregar información de puntos estrictos a las observaciones si existen
+                let observationsWithStrict = [...result.observations];
+                if (strictPoints > 0) {
+                    observationsWithStrict.push(`${strictPoints} punto${strictPoints > 1 ? 's' : ''} estricto${strictPoints > 1 ? 's' : ''}`);
+                }
 
                 row.innerHTML = `
                     <td>${routeName}</td>
@@ -467,7 +516,7 @@
                         result.status === 'error' ? 'Erróneo' : 'Imposible'
                     }</span></td>
                     <td class="coordinates">${coordsStr}</td>
-                    <td>${result.observations.join('. ')}</td>
+                    <td>${observationsWithStrict.join('. ')}</td>
                 `;
                 
                 tbody.appendChild(row);

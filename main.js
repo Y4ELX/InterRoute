@@ -13,6 +13,36 @@ function initMap() {
     }).addTo(map);
     
     routeLayerGroup = L.layerGroup().addTo(map);
+    
+    // Corregir problema de tiles blancos cuando se redimensiona
+    setTimeout(() => {
+        map.invalidateSize();
+    }, 100);
+}
+
+// Función para corregir el tamaño del mapa
+function fixMapSize() {
+    if (map) {
+        setTimeout(() => {
+            map.invalidateSize();
+        }, 100);
+    }
+}
+
+// Observar cambios de tamaño del contenedor del mapa
+function setupMapResizeObserver() {
+    if (window.ResizeObserver) {
+        const mapContainer = document.getElementById('mapContainer');
+        if (mapContainer) {
+            const resizeObserver = new ResizeObserver(entries => {
+                fixMapSize();
+            });
+            resizeObserver.observe(mapContainer);
+        }
+    }
+    
+    // Fallback para navegadores más antiguos
+    window.addEventListener('resize', fixMapSize);
 }
 
 // Función para encontrar la clave de ruta en rutasReales
@@ -460,7 +490,11 @@ function selectTransportType(origin, destination, transportType) {
     // Inicializar mapa si no existe
     if (!map) {
         initMap();
+        setupMapResizeObserver();
     }
+    
+    // Corregir tamaño del mapa cuando se muestra
+    fixMapSize();
     
     // Mostrar ruta en el mapa
     showRouteOnMap(origin, destination, transportType);
@@ -472,6 +506,11 @@ function selectTransportType(origin, destination, transportType) {
     document.getElementById('transportDetails').scrollIntoView({ 
         behavior: 'smooth' 
     });
+    
+    // Corregir mapa después del scroll
+    setTimeout(() => {
+        fixMapSize();
+    }, 500);
 }
 
 // Función para calcular costos y mostrar información de ruta
@@ -1210,6 +1249,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Event listener para el botón de calcular costo
     document.getElementById('calculateCost').addEventListener('click', calculateRouteInfo);
+    
+    // Configurar el observador de redimensionamiento del mapa
+    setupMapResizeObserver();
     
     // Verificar si rutasReales está disponible
     if (typeof rutasReales === 'undefined') {
