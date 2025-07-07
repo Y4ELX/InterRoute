@@ -6,11 +6,38 @@ let currentTransportType = null;
 
 // Configuración del mapa
 function initMap() {
-    map = L.map('mapContainer').setView([20.0, 0.0], 2);
+    map = L.map('mapContainer', {
+        maxBounds: [[-90, -360], [90, 360]], // Limita estrictamente a dos copias del mundo
+        maxBoundsViscosity: 1.0, // Hace que los límites sean completamente estrictos
+        minZoom: 2, // Zoom mínimo para evitar ver demasiadas copias
+        maxZoom: 8 // Zoom máximo para mantener el contexto global
+    }).setView([20.0, 0.0], 2);
     
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
+        attribution: '© OpenStreetMap contributors',
+        noWrap: false, // Permite que los tiles se repitan
+        bounds: [[-90, -360], [90, 360]] // Limita los tiles estrictamente a dos copias del mundo
     }).addTo(map);
+    
+    // Evento para prevenir pan más allá de los límites estrictos
+    map.on('moveend', function() {
+        const center = map.getCenter();
+        const lng = center.lng;
+        
+        // Si se ha movido más allá de los límites permitidos, corregir la posición
+        if (lng < -360 || lng > 360) {
+            // Normalizar la longitud al rango permitido
+            let normalizedLng = lng;
+            if (lng < -360) {
+                normalizedLng = -360 + (lng % 360);
+            } else if (lng > 360) {
+                normalizedLng = 360 - (lng % 360);
+            }
+            
+            // Corregir la posición del mapa
+            map.setView([center.lat, normalizedLng], map.getZoom());
+        }
+    });
     
     routeLayerGroup = L.layerGroup().addTo(map);
     
@@ -235,11 +262,33 @@ function showRouteOnMap(origin, destination, transportType) {
     
     // Dibujar la ruta
     const color = getTransportColor(transportType);
-    const polyline = drawRoute(coordinates, color, transportType);
+    const result = drawRoute(coordinates, color, transportType);
     
-    if (polyline) {
-        // Ajustar vista del mapa para mostrar toda la ruta
-        map.fitBounds(polyline.getBounds(), { padding: [20, 20] });
+    // Ajustar vista del mapa
+    if (result && result.polylines && result.polylines.length > 0) {
+        // Para rutas que cruzan el antimeridiano, centrar en el Pacífico
+        if (transportType === 'aerea' && shouldCrossPacific(coordinates[0], coordinates[coordinates.length - 1])) {
+            // Determinar la mejor vista según la dirección de la ruta
+            const startLng = coordinates[0][1];
+            const endLng = coordinates[coordinates.length - 1][1];
+            
+            if (startLng > 0 && endLng < 0) {
+                // Ruta Asia → América: centrar en el Pacífico Norte
+                map.setView([40, 180], 3);
+            } else if (startLng < 0 && endLng > 0) {
+                // Ruta América → Asia: centrar en el Pacífico Norte
+                map.setView([40, -180], 3);
+            } else {
+                // Vista por defecto del Pacífico
+                map.setView([30, -150], 3);
+            }
+        } else {
+            // Para rutas normales, ajustar a los límites
+            map.fitBounds(result.polylines[0].getBounds(), { padding: [20, 20] });
+        }
+    } else if (result && result.getBounds) {
+        // Compatibilidad con el formato anterior
+        map.fitBounds(result.getBounds(), { padding: [20, 20] });
     }
 }
 
@@ -279,7 +328,13 @@ function drawRoute(coordinates, color, transportType) {
         polylineOptions.dashArray = '5, 10'; // Línea discontinua para terrestre
     }
     
+    // Para rutas aéreas transpacíficas, usar el sistema de mundo duplicado
+    let polylines = [];
+    let allBounds = [];
+    
     const polyline = L.polyline(routeCoordinates, polylineOptions).addTo(routeLayerGroup);
+    polylines.push(polyline);
+    allBounds.push(polyline.getBounds());
     
     // Definir iconos de transporte
     const transportIcons = {
@@ -288,10 +343,31 @@ function drawRoute(coordinates, color, transportType) {
         'aerea': '✈️'
     };
     
-    // Agregar marcadores de inicio y fin con iconos apropiados
+    // Obtener coordenadas originales para los marcadores
     const startCoords = extractCoords(coordinates[0]);
     const endCoords = extractCoords(coordinates[coordinates.length - 1]);
     
+    // Para rutas transpacíficas, ajustar la posición del marcador de meta
+    let finalEndCoords = endCoords;
+    
+    // Detectar si es una ruta transpacífica aérea
+    if (transportType === 'aerea' && shouldCrossPacific(startCoords, endCoords)) {
+        const startLng = startCoords[1];
+        const endLng = endCoords[1];
+        
+        // Si es ruta Asia → América (longitud positiva → negativa)
+        if (startLng > 0 && endLng < 0) {
+            // El destino debe aparecer en la copia derecha del mundo
+            finalEndCoords = [endCoords[0], endCoords[1] + 360];
+        }
+        // Si es ruta América → Asia (longitud negativa → positiva) 
+        else if (startLng < 0 && endLng > 0) {
+            // El destino debe aparecer en la copia izquierda del mundo
+            finalEndCoords = [endCoords[0], endCoords[1] - 360];
+        }
+    }
+    
+    // Agregar marcadores de inicio y fin con iconos apropiados
     const startMarker = L.marker(startCoords, {
         icon: L.divIcon({
             html: transportIcons[transportType],
@@ -300,7 +376,7 @@ function drawRoute(coordinates, color, transportType) {
         })
     }).addTo(routeLayerGroup);
     
-    const endMarker = L.marker(endCoords, {
+    const endMarker = L.marker(finalEndCoords, {
         icon: L.divIcon({
             html: '🏁',
             className: 'transport-marker',
@@ -308,10 +384,10 @@ function drawRoute(coordinates, color, transportType) {
         })
     }).addTo(routeLayerGroup);
     
-    // Agregar marcador de transporte en punto intermedio
-    if (coordinates.length > 2) {
-        const midPoint = Math.floor(coordinates.length / 2);
-        const midCoords = extractCoords(coordinates[midPoint]);
+    // Agregar marcador de transporte en punto intermedio (usar coordenadas de la ruta curvada)
+    if (routeCoordinates.length > 2) {
+        const midPoint = Math.floor(routeCoordinates.length / 2);
+        const midCoords = extractCoords(routeCoordinates[midPoint]);
         const transportMarker = L.marker(midCoords, {
             icon: L.divIcon({
                 html: transportIcons[transportType],
@@ -321,7 +397,15 @@ function drawRoute(coordinates, color, transportType) {
         }).addTo(routeLayerGroup);
     }
     
-    return polyline;
+    // Devolver información sobre las polylines creadas
+    return {
+        polylines: polylines,
+        bounds: allBounds,
+        // Mantener compatibilidad con código anterior
+        getBounds: function() {
+            return polylines.length > 0 ? polylines[0].getBounds() : null;
+        }
+    };
 }
 
 // Función para mostrar opciones de carga específicas según el tipo de transporte
@@ -1068,6 +1152,84 @@ function createCurvedRoute(coordinates) {
     const start = coordinates[0];
     const end = coordinates[coordinates.length - 1];
     
+    // Detectar si la ruta cruza el antimeridiano (Pacífico)
+    const crossesPacific = shouldCrossPacific(start, end);
+    
+    if (crossesPacific) {
+        return createPacificRoute(start, end);
+    } else {
+        return createStandardRoute(start, end);
+    }
+}
+
+// Función para determinar si una ruta debe cruzar el Pacífico
+function shouldCrossPacific(start, end) {
+    const startLng = start[1];
+    const endLng = end[1];
+    
+    // Rutas que van del oeste de América (-100 a -60) al este de Asia (100 a 140)
+    // o viceversa, deben cruzar el Pacífico
+    const isWestAmericaToEastAsia = (startLng < -60 && endLng > 100);
+    const isEastAsiaToWestAmerica = (startLng > 100 && endLng < -60);
+    
+    return isWestAmericaToEastAsia || isEastAsiaToWestAmerica;
+}
+
+// Función para crear ruta transpacífica
+function createPacificRoute(start, end) {
+    const startLat = start[0];
+    const startLng = start[1];
+    const endLat = end[0];
+    const endLng = end[1];
+    
+    const curvedPoints = [];
+    const numPoints = 50; // Más puntos para rutas transpacíficas más suaves
+    
+    // Determinar dirección (oeste a este o este a oeste)
+    const goingWest = startLng > 0 && endLng < 0; // De Asia a América
+    const goingEast = startLng < 0 && endLng > 0; // De América a Asia
+    
+    if (goingWest) {
+        // Ruta Asia → América (China → México)
+        // Usar la copia del mundo de la derecha para mostrar la continuidad
+        for (let i = 0; i <= numPoints; i++) {
+            const t = i / numPoints;
+            
+            // Interpolación de latitud con arco hacia el norte
+            const lat = startLat + (endLat - startLat) * t + 
+                       Math.sin(t * Math.PI) * 12; // Arco de 12 grados hacia el norte
+            
+            // Para longitud, crear ruta que va directamente hacia el este
+            // usando la copia extendida del mundo (0 a 360 grados)
+            const adjustedEndLng = endLng + 360; // Mover el destino a la copia de la derecha
+            const lng = startLng + (adjustedEndLng - startLng) * t;
+            
+            curvedPoints.push([lat, lng]);
+        }
+    } else if (goingEast) {
+        // Ruta América → Asia (México → China)
+        // Usar la copia del mundo de la izquierda para mostrar la continuidad
+        for (let i = 0; i <= numPoints; i++) {
+            const t = i / numPoints;
+            
+            // Interpolación de latitud con arco hacia el norte
+            const lat = startLat + (endLat - startLat) * t + 
+                       Math.sin(t * Math.PI) * 12; // Arco de 12 grados hacia el norte
+            
+            // Para longitud, crear ruta que va directamente hacia el oeste
+            // usando la copia extendida del mundo (-360 a 0 grados)
+            const adjustedEndLng = endLng - 360; // Mover el destino a la copia de la izquierda
+            const lng = startLng + (adjustedEndLng - startLng) * t;
+            
+            curvedPoints.push([lat, lng]);
+        }
+    }
+    
+    return curvedPoints;
+}
+
+// Función para crear ruta estándar (no transpacífica)
+function createStandardRoute(start, end) {
     // Calcular el punto medio
     const midLat = (start[0] + end[0]) / 2;
     const midLng = (start[1] + end[1]) / 2;
