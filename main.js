@@ -203,27 +203,22 @@ function showRouteOnMap(origin, destination, transportType) {
 function drawRoute(coordinates, color, transportType) {
     if (!coordinates || coordinates.length < 2) return null;
     
-    let polyline;
+    let routeCoordinates = coordinates;
+    let polylineOptions = {
+        color: color,
+        weight: 4,
+        opacity: 0.8
+    };
     
-    // Para rutas aéreas, crear una curva
+    // Solo aplicar curvas y estilos especiales para rutas aéreas
     if (transportType === 'aerea') {
-        const curvedCoordinates = createCurvedRoute(coordinates);
-        polyline = L.polyline(curvedCoordinates, {
-            color: color,
-            weight: 4,
-            opacity: 0.8,
-            dashArray: '10, 5' // Línea punteada para aviones
-        }).addTo(routeLayerGroup);
-    } else {
-        // Para rutas terrestres y marítimas, usar línea normal
-        polyline = L.polyline(coordinates, {
-            color: color,
-            weight: 4,
-            opacity: 0.8
-        }).addTo(routeLayerGroup);
+        routeCoordinates = createCurvedRoute(coordinates);
+        polylineOptions.dashArray = '10, 5'; // Línea punteada para aviones
     }
     
-    // Agregar marcadores de inicio y fin
+    const polyline = L.polyline(routeCoordinates, polylineOptions).addTo(routeLayerGroup);
+    
+    // Agregar marcadores de inicio y fin (usar coordenadas originales)
     const startMarker = L.marker(coordinates[0], {
         icon: L.divIcon({
             html: '🚀',
@@ -1007,7 +1002,6 @@ function createCurvedRoute(coordinates) {
     );
     
     // Crear un arco elevado para simular la curvatura de la Tierra
-    // La elevación depende de la distancia
     const elevation = distance * 0.3; // Factor de curvatura
     
     // Determinar si vamos hacia el este o hacia el oeste
@@ -1028,12 +1022,12 @@ function createCurvedRoute(coordinates) {
     
     // Generar puntos intermedios para crear una curva suave
     const curvedPoints = [];
-    const numPoints = 20; // Número de puntos para la curva
+    const numPoints = 20;
     
     for (let i = 0; i <= numPoints; i++) {
         const t = i / numPoints;
         
-        // Usar interpolación cuadrática de Bézier para crear la curva
+        // Usar interpolación cuadrática de Bézier
         const lat = Math.pow(1 - t, 2) * start[0] + 
                    2 * (1 - t) * t * controlLat + 
                    Math.pow(t, 2) * end[0];
