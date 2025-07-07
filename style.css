@@ -122,7 +122,7 @@ header p {
 
 /* Gradiente para el logo */
 .logo-svg path {
-    fill: url(#logoGradient);
+    fill: #007AFF;
 }
 
 /* Definir gradiente inline para el SVG */

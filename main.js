@@ -742,16 +742,16 @@ function updateDestinationOptions() {
     const currentDestination = destination.value;
     
     // Limpiar opciones de destino
-    destination.innerHTML = '<option value="">Seleccione país</option>';
+    destination.innerHTML = '<option value="">Seleccione país de destino</option>';
     
-    // Lista de países disponibles
+    // Lista de países disponibles con emojis
     const countries = [
-        { value: 'Mexico', text: 'México' },
-        { value: 'Estados_Unidos', text: 'Estados Unidos' },
-        { value: 'China', text: 'China' },
-        { value: 'Alemania', text: 'Alemania' },
-        { value: 'Paises_Bajos', text: 'Países Bajos' },
-        { value: 'Corea', text: 'Corea del Sur' }
+        { value: 'Mexico', text: '🇲🇽 México' },
+        { value: 'Estados_Unidos', text: '🇺🇸 Estados Unidos' },
+        { value: 'China', text: '🇨🇳 China' },
+        { value: 'Alemania', text: '🇩🇪 Alemania' },
+        { value: 'Paises_Bajos', text: '🇳🇱 Países Bajos' },
+        { value: 'Corea', text: '🇰🇷 Corea del Sur' }
     ];
     
     // Si el origen es México, mostrar todos los demás países
@@ -769,7 +769,7 @@ function updateDestinationOptions() {
     else if (origin && origin !== '') {
         const option = document.createElement('option');
         option.value = 'Mexico';
-        option.textContent = 'México';
+        option.textContent = '🇲🇽 México';
         destination.appendChild(option);
     }
     // Si no hay origen seleccionado, mostrar todos
@@ -795,16 +795,16 @@ function updateOriginOptions() {
     const currentOrigin = origin.value;
     
     // Limpiar opciones de origen
-    origin.innerHTML = '<option value="">Seleccione país</option>';
+    origin.innerHTML = '<option value="">Seleccione país de origen</option>';
     
-    // Lista de países disponibles
+    // Lista de países disponibles con emojis
     const countries = [
-        { value: 'Mexico', text: 'México' },
-        { value: 'Estados_Unidos', text: 'Estados Unidos' },
-        { value: 'China', text: 'China' },
-        { value: 'Alemania', text: 'Alemania' },
-        { value: 'Paises_Bajos', text: 'Países Bajos' },
-        { value: 'Corea', text: 'Corea del Sur' }
+        { value: 'Mexico', text: '🇲🇽 México' },
+        { value: 'Estados_Unidos', text: '🇺🇸 Estados Unidos' },
+        { value: 'China', text: '🇨🇳 China' },
+        { value: 'Alemania', text: '🇩🇪 Alemania' },
+        { value: 'Paises_Bajos', text: '🇳🇱 Países Bajos' },
+        { value: 'Corea', text: '🇰🇷 Corea del Sur' }
     ];
     
     // Si el destino es México, mostrar todos los demás países
@@ -822,7 +822,7 @@ function updateOriginOptions() {
     else if (destination && destination !== '') {
         const option = document.createElement('option');
         option.value = 'Mexico';
-        option.textContent = 'México';
+        option.textContent = '🇲🇽 México';
         origin.appendChild(option);
     }
     // Si no hay destino seleccionado, mostrar todos
