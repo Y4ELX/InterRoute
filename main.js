@@ -251,13 +251,20 @@ function drawRoute(coordinates, color, transportType) {
     
     const polyline = L.polyline(routeCoordinates, polylineOptions).addTo(routeLayerGroup);
     
-    // Agregar marcadores de inicio y fin (usar coordenadas extraídas)
+    // Definir iconos de transporte
+    const transportIcons = {
+        'terrestre': '🚛',
+        'maritima': '🚢',
+        'aerea': '✈️'
+    };
+    
+    // Agregar marcadores de inicio y fin con iconos apropiados
     const startCoords = extractCoords(coordinates[0]);
     const endCoords = extractCoords(coordinates[coordinates.length - 1]);
     
     const startMarker = L.marker(startCoords, {
         icon: L.divIcon({
-            html: '🚀',
+            html: transportIcons[transportType],
             className: 'transport-marker',
             iconSize: [30, 30]
         })
@@ -271,13 +278,7 @@ function drawRoute(coordinates, color, transportType) {
         })
     }).addTo(routeLayerGroup);
     
-    // Agregar marcadores de transporte en puntos intermedios
-    const transportIcons = {
-        'terrestre': '🚛',
-        'maritima': '🚢',
-        'aerea': '✈️'
-    };
-    
+    // Agregar marcador de transporte en punto intermedio
     if (coordinates.length > 2) {
         const midPoint = Math.floor(coordinates.length / 2);
         const midCoords = extractCoords(coordinates[midPoint]);
@@ -288,23 +289,6 @@ function drawRoute(coordinates, color, transportType) {
                 iconSize: [30, 30]
             })
         }).addTo(routeLayerGroup);
-    }
-    
-    // Agregar marcadores especiales para puntos estrictos (solo para rutas marítimas)
-    if (transportType === 'maritima') {
-        coordinates.forEach((coord, index) => {
-            if (coord.strict) {
-                const strictCoords = extractCoords(coord);
-                const strictMarker = L.marker(strictCoords, {
-                    icon: L.divIcon({
-                        html: '⚓',
-                        className: 'strict-point-marker',
-                        iconSize: [25, 25]
-                    }),
-                    title: 'Punto estricto - Canal de Panamá'
-                }).addTo(routeLayerGroup);
-            }
-        });
     }
     
     return polyline;
