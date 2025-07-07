@@ -938,7 +938,7 @@ function getTransportInfo(coordinates, transportType) {
         // México - Puertos
         'altamira_port': { name: 'Puerto de Altamira', coords: [22.4883, -97.8580] },
         // México - Aeropuertos
-        'mexico_airport': { name: 'AICM Ciudad de México', coords: [19.4363, -99.0721] },
+        'mexico_airport': { name: 'Aeropuerto Internacional de Tampico', coords: [22.291454589123013, -97.86610239439382] },
         // México - Frontera terrestre
         'nuevo_laredo': { name: 'Nuevo Laredo, Tamaulipas', coords: [25.6866, -100.3161] },
         
