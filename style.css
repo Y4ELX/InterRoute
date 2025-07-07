@@ -98,6 +98,56 @@ header p {
     font-weight: 500;
 }
 
+/* Logo SVG estilos */
+.logo-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.logo-svg {
+    width: min(90vw, 250px);
+    height: auto;
+    max-height: 80px;
+    color: var(--gray-900);
+    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.1));
+    transition: var(--transition-smooth);
+}
+
+.logo-svg:hover {
+    transform: scale(1.05);
+    filter: drop-shadow(0 6px 20px rgba(0, 0, 0, 0.15));
+}
+
+/* Gradiente para el logo */
+.logo-svg path {
+    fill: url(#logoGradient);
+}
+
+/* Definir gradiente inline para el SVG */
+.logo-svg defs {
+    --gradient-start: var(--primary-blue);
+    --gradient-end: var(--primary-purple);
+}
+
+/* Efecto de brillo en el logo */
+@keyframes logoShine {
+    0% {
+        filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.1));
+    }
+    50% {
+        filter: drop-shadow(0 6px 20px rgba(0, 122, 255, 0.3));
+    }
+    100% {
+        filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.1));
+    }
+}
+
+.logo-svg {
+    animation: logoShine 4s ease-in-out infinite;
+}
+
 /* Container principal con estilo iOS mejorado */
 main {
     max-width: min(95vw, 420px);
