@@ -10,7 +10,7 @@ function initMap() {
         maxBounds: [[-90, -360], [90, 360]], // Limita estrictamente a dos copias del mundo
         maxBoundsViscosity: 1.0, // Hace que los límites sean completamente estrictos
         minZoom: 2, // Zoom mínimo para evitar ver demasiadas copias
-        maxZoom: 8 // Zoom máximo para mantener el contexto global
+        maxZoom: 11 // Zoom máximo para mantener el contexto global
     }).setView([20.0, 0.0], 2);
     
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
