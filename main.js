@@ -14,15 +14,28 @@ function initMap() {
     routeLayerGroup = L.layerGroup().addTo(map);
 }
 
-// Función para mostrar/ocultar el selector de contenedor
-function toggleContainerType() {
+// Función para mostrar/ocultar los selectores según el tipo de carga
+function toggleCargoFields() {
     const cargoType = document.getElementById('cargoType').value;
     const containerGroup = document.getElementById('containerTypeGroup');
+    const containerQuantityGroup = document.getElementById('containerQuantityGroup');
+    const netWeightGroup = document.getElementById('netWeightGroup');
+    const grossWeightGroup = document.getElementById('grossWeightGroup');
+    
+    // Ocultar todos los campos primero
+    containerGroup.style.display = 'none';
+    containerQuantityGroup.style.display = 'none';
+    netWeightGroup.style.display = 'none';
+    grossWeightGroup.style.display = 'none';
     
     if (cargoType === 'contenedor') {
+        // Mostrar campos de contenedor
         containerGroup.style.display = 'block';
-    } else {
-        containerGroup.style.display = 'none';
+        containerQuantityGroup.style.display = 'block';
+    } else if (cargoType === 'suelta') {
+        // Mostrar campos de peso para carga suelta
+        netWeightGroup.style.display = 'block';
+        grossWeightGroup.style.display = 'block';
     }
 }
 
@@ -60,7 +73,7 @@ function getTransportColor(type) {
 }
 
 // Función para obtener información de costos y tiempos estimados
-function getRouteInfo(origin, destination, transportType, cargoType, containerType) {
+function getRouteInfo(origin, destination, transportType, cargoType, containerType, containerQuantity, netWeight, grossWeight) {
     const distances = {
         'terrestre': { base: 2000, multiplier: 1.0 },
         'maritima': { base: 8000, multiplier: 1.5 },
@@ -72,13 +85,29 @@ function getRouteInfo(origin, destination, transportType, cargoType, containerTy
     
     // Ajustar costos según tipo de carga
     let costMultiplier = 1.0;
+    let cargoDetails = '';
+    
     if (cargoType === 'contenedor') {
-        costMultiplier = 1.5;
+        const quantity = parseInt(containerQuantity) || 1;
+        costMultiplier = 1.5 * quantity;
+        
         if (containerType === 'reefer') {
-            costMultiplier = 2.0;
+            costMultiplier *= 2.0;
         } else if (containerType === 'highcube') {
-            costMultiplier = 1.3;
+            costMultiplier *= 1.3;
         }
+        
+        cargoDetails = `${quantity} ${containerType === 'dryvan' ? 'Dry Van' : 
+                                    containerType === 'highcube' ? 'High Cube' : 'Reefer'}${quantity > 1 ? 's' : ''}`;
+        
+    } else if (cargoType === 'suelta') {
+        const weightKg = parseFloat(grossWeight) || 1000;
+        const weightTons = weightKg / 1000;
+        
+        // Costo basado en peso bruto
+        costMultiplier = Math.max(1.0, weightTons * 0.8);
+        
+        cargoDetails = `Peso neto: ${parseFloat(netWeight).toLocaleString()} kg, Peso bruto: ${parseFloat(grossWeight).toLocaleString()} kg`;
     }
     
     const estimatedCost = Math.round(baseCost * costMultiplier);
@@ -87,7 +116,8 @@ function getRouteInfo(origin, destination, transportType, cargoType, containerTy
     return {
         cost: estimatedCost,
         time: estimatedTime,
-        impact: estimatedCost < 3000 ? 'low' : estimatedCost < 6000 ? 'medium' : 'high'
+        impact: estimatedCost < 3000 ? 'low' : estimatedCost < 6000 ? 'medium' : 'high',
+        cargoDetails: cargoDetails
     };
 }
 
@@ -140,7 +170,7 @@ function drawRoute(coordinates, color, transportType) {
 }
 
 // Función para mostrar rutas sugeridas
-function showSuggestedRoutes(origin, destination, cargoType, containerType) {
+function showSuggestedRoutes(origin, destination, cargoType, containerType, containerQuantity, netWeight, grossWeight) {
     const routeKey = findRouteKey(origin, destination);
     
     if (!routeKey) {
@@ -158,7 +188,7 @@ function showSuggestedRoutes(origin, destination, cargoType, containerType) {
     // Crear tarjetas para cada tipo de transporte disponible
     Object.keys(routeData).forEach(transportType => {
         const coordinates = routeData[transportType];
-        const routeInfo = getRouteInfo(origin, destination, transportType, cargoType, containerType);
+        const routeInfo = getRouteInfo(origin, destination, transportType, cargoType, containerType, containerQuantity, netWeight, grossWeight);
         
         const routeCard = document.createElement('div');
         routeCard.className = 'route-card';
@@ -175,6 +205,7 @@ function showSuggestedRoutes(origin, destination, cargoType, containerType) {
                     routeInfo.impact === 'low' ? 'Bajo' : 
                     routeInfo.impact === 'medium' ? 'Medio' : 'Alto'
                 }</span></div>
+                ${routeInfo.cargoDetails ? `<div><strong>Carga:</strong> ${routeInfo.cargoDetails}</div>` : ''}
             </div>
         `;
         
@@ -224,6 +255,9 @@ function handleFormSubmit(e) {
     const destination = document.getElementById('destination').value;
     const cargoType = document.getElementById('cargoType').value;
     const containerType = document.getElementById('containerType').value;
+    const containerQuantity = document.getElementById('containerQuantity').value;
+    const netWeight = document.getElementById('netWeight').value;
+    const grossWeight = document.getElementById('grossWeight').value;
     
     if (!origin || !destination || !cargoType) {
         alert('Por favor, complete todos los campos requeridos.');
@@ -235,6 +269,31 @@ function handleFormSubmit(e) {
         return;
     }
     
+    // Validaciones específicas por tipo de carga
+    if (cargoType === 'contenedor') {
+        if (!containerType || !containerQuantity) {
+            alert('Por favor, seleccione el tipo de contenedor y especifique la cantidad.');
+            return;
+        }
+        if (containerQuantity < 1 || containerQuantity > 100) {
+            alert('La cantidad de contenedores debe estar entre 1 y 100.');
+            return;
+        }
+    } else if (cargoType === 'suelta') {
+        if (!netWeight || !grossWeight) {
+            alert('Por favor, especifique el peso neto y el peso bruto de la carga.');
+            return;
+        }
+        if (parseFloat(netWeight) <= 0 || parseFloat(grossWeight) <= 0) {
+            alert('Los pesos deben ser mayores a 0.');
+            return;
+        }
+        if (parseFloat(netWeight) > parseFloat(grossWeight)) {
+            alert('El peso neto no puede ser mayor al peso bruto.');
+            return;
+        }
+    }
+    
     // Mostrar sección de rutas
     document.getElementById('routesSection').style.display = 'block';
     
@@ -244,7 +303,7 @@ function handleFormSubmit(e) {
     }
     
     // Mostrar rutas sugeridas
-    showSuggestedRoutes(origin, destination, cargoType, containerType);
+    showSuggestedRoutes(origin, destination, cargoType, containerType, containerQuantity, netWeight, grossWeight);
     
     // Scroll suave hacia las rutas
     document.getElementById('routesSection').scrollIntoView({ 
@@ -256,7 +315,7 @@ function handleFormSubmit(e) {
 document.addEventListener('DOMContentLoaded', function() {
     // Configurar event listeners
     document.getElementById('routeForm').addEventListener('submit', handleFormSubmit);
-    document.getElementById('cargoType').addEventListener('change', toggleContainerType);
+    document.getElementById('cargoType').addEventListener('change', toggleCargoFields);
     
     // Verificar si rutasReales está disponible
     if (typeof rutasReales === 'undefined') {

@@ -56,6 +56,18 @@
                         <option value="reefer">Reefer</option>
                     </select>
                 </div>
+                <div class="form-group" id="containerQuantityGroup" style="display:none;">
+                    <label for="containerQuantity">Cantidad de contenedores</label>
+                    <input type="number" id="containerQuantity" name="containerQuantity" min="1" max="100" placeholder="Ej: 5">
+                </div>
+                <div class="form-group" id="netWeightGroup" style="display:none;">
+                    <label for="netWeight">Peso neto (kg)</label>
+                    <input type="number" id="netWeight" name="netWeight" min="1" max="50000" placeholder="Ej: 2000">
+                </div>
+                <div class="form-group" id="grossWeightGroup" style="display:none;">
+                    <label for="grossWeight">Peso bruto (kg)</label>
+                    <input type="number" id="grossWeight" name="grossWeight" min="1" max="50000" placeholder="Ej: 2500">
+                </div>
                 <button type="submit">Sugerir rutas</button>
             </form>
         </section>
