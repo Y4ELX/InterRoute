@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InterRoute - Sugerencia de Rutas Internacionales</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>InterRoute</h1>
+        <p>Simulador de rutas internacionales de envío de mercancías</p>
+    </header>
+    <main>
+        <section class="form-section">
+            <form id="routeForm">
+                <div class="form-group">
+                    <label for="origin">Origen</label>
+                    <select id="origin" name="origin" required>
+                        <option value="">Seleccione país</option>
+                        <option value="Mexico">México</option>
+                        <option value="Estados_Unidos">Estados Unidos</option>
+                        <option value="China">China</option>
+                        <option value="Alemania">Alemania</option>
+                        <option value="Japon">Japón</option>
+                        <option value="Paises_Bajos">Países Bajos</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="destination">Destino</label>
+                    <select id="destination" name="destination" required>
+                        <option value="">Seleccione país</option>
+                        <option value="Mexico">México</option>
+                        <option value="Estados_Unidos">Estados Unidos</option>
+                        <option value="China">China</option>
+                        <option value="Alemania">Alemania</option>
+                        <option value="Japon">Japón</option>
+                        <option value="Paises_Bajos">Países Bajos</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="cargoType">Tipo de mercancía</label>
+                    <select id="cargoType" name="cargoType" required>
+                        <option value="">Seleccione tipo</option>
+                        <option value="suelta">Carga suelta</option>
+                        <option value="contenedor">Contenerizada</option>
+                    </select>
+                </div>
+                <div class="form-group" id="containerTypeGroup" style="display:none;">
+                    <label for="containerType">Tipo de contenedor</label>
+                    <select id="containerType" name="containerType">
+                        <option value="">Seleccione contenedor</option>
+                        <option value="dryvan">Dry Van</option>
+                        <option value="highcube">High Cube</option>
+                        <option value="reefer">Reefer</option>
+                    </select>
+                </div>
+                <button type="submit">Sugerir rutas</button>
+            </form>
+        </section>
+        <section id="routesSection" class="routes-section" style="display:none;">
+            <h2>Rutas sugeridas</h2>
+            <div id="mapContainer" style="height: 400px; margin-bottom: 1rem; border-radius: 8px; overflow: hidden;"></div>
+            <div id="routesContainer"></div>
+        </section>
+    </main>
+    <footer>
+        <p>&copy; 2025 InterRoute</p>
+    </footer>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="rutasReales.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>

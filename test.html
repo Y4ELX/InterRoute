@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análisis de Rutas - InterRoute</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1a73e8;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .summary {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+        .summary h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: #fff;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #e0e0e0;
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #1a73e8;
+        }
+        .stat-label {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        .route-ok {
+            background-color: #e8f5e8;
+        }
+        .route-warning {
+            background-color: #fff3cd;
+        }
+        .route-error {
+            background-color: #f8d7da;
+        }
+        .route-impossible {
+            background-color: #343a40;
+            color: white;
+        }
+        .transport-type {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .terrestre {
+            background: #fff3e0;
+            color: #e65100;
+        }
+        .maritima {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+        .aerea {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+        .distance-info {
+            font-size: 12px;
+            color: #666;
+        }
+        .status {
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        .status-ok {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .status-impossible {
+            background: #343a40;
+            color: white;
+        }
+        .coordinates {
+            font-family: monospace;
+            font-size: 11px;
+            color: #555;
+        }
+        .filter-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+        .filter-section select {
+            padding: 5px;
+            margin: 0 10px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+        #loadingMessage {
+            text-align: center;
+            padding: 20px;
+            font-size: 18px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Análisis de Rutas InterRoute</h1>
+        <div id="loadingMessage">Analizando rutas...</div>
+        <div id="content" style="display: none;">
+            <div class="summary">
+                <h3>📊 Resumen del Análisis</h3>
+                <div class="stats">
+                    <div class="stat-card">
+                        <div class="stat-number" id="totalRoutes">0</div>
+                        <div class="stat-label">Rutas Totales</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="okRoutes">0</div>
+                        <div class="stat-label">Rutas Correctas</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="warningRoutes">0</div>
+                        <div class="stat-label">Rutas Dudosas</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="errorRoutes">0</div>
+                        <div class="stat-label">Rutas Erróneas</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="impossibleRoutes">0</div>
+                        <div class="stat-label">Rutas Imposibles</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="filter-section">
+                <label>Filtrar por estado:</label>
+                <select id="statusFilter">
+                    <option value="all">Todas las rutas</option>
+                    <option value="impossible">Solo imposibles</option>
+                    <option value="error">Solo erróneas</option>
+                    <option value="warning">Solo dudosas</option>
+                    <option value="ok">Solo correctas</option>
+                </select>
+                
+                <label>Filtrar por transporte:</label>
+                <select id="transportFilter">
+                    <option value="all">Todos los tipos</option>
+                    <option value="terrestre">Terrestre</option>
+                    <option value="maritima">Marítima</option>
+                    <option value="aerea">Aérea</option>
+                </select>
+            </div>
+
+            <table id="routeTable">
+                <thead>
+                    <tr>
+                        <th>Ruta</th>
+                        <th>Tipo</th>
+                        <th>Distancia Real (km)</th>
+                        <th>Distancia Ruta (km)</th>
+                        <th>Diferencia</th>
+                        <th>Estado</th>
+                        <th>Coordenadas</th>
+                        <th>Observaciones</th>
+                    </tr>
+                </thead>
+                <tbody id="routeTableBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="rutasReales.js"></script>
+    <script>
+        // Función para calcular distancia entre dos puntos (fórmula de Haversine)
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Radio de la Tierra en km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                     Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                     Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        // Función para calcular distancia total de una ruta
+        function calculateRouteDistance(coordinates) {
+            let totalDistance = 0;
+            for (let i = 0; i < coordinates.length - 1; i++) {
+                totalDistance += calculateDistance(
+                    coordinates[i][0], coordinates[i][1],
+                    coordinates[i+1][0], coordinates[i+1][1]
+                );
+            }
+            return totalDistance;
+        }
+
+        // Coordenadas aproximadas de las capitales/ciudades principales
+        const countryCenters = {
+            'MEX': [19.4326, -99.1332],
+            'USA': [39.8283, -98.5795],
+            'CHN': [35.8617, 104.1954],
+            'GER': [51.1657, 10.4515],
+            'JPN': [36.2048, 138.2529],
+            'NLD': [52.1326, 5.2913]
+        };
+
+        // Mapeo de códigos a nombres completos
+        const countryNames = {
+            'MEX': 'México',
+            'USA': 'Estados Unidos',
+            'CHN': 'China',
+            'GER': 'Alemania',
+            'JPN': 'Japón',
+            'NLD': 'Países Bajos'
+        };
+
+        // Función para verificar si una ruta terrestre es geográficamente imposible
+        function isImpossibleTerrestrialRoute(origin, destination) {
+            // Definir grupos de países por continente/masa terrestre
+            const continentalGroups = {
+                'northAmerica': ['USA', 'MEX'],
+                'europe': ['GER', 'NLD'],
+                'asia': ['CHN', 'JPN']
+            };
+            
+            // Encontrar el grupo de cada país
+            let originGroup = null;
+            let destinationGroup = null;
+            
+            for (const [groupName, countries] of Object.entries(continentalGroups)) {
+                if (countries.includes(origin)) {
+                    originGroup = groupName;
+                }
+                if (countries.includes(destination)) {
+                    destinationGroup = groupName;
+                }
+            }
+            
+            // Si están en diferentes grupos continentales, es imposible por tierra
+            if (originGroup && destinationGroup && originGroup !== destinationGroup) {
+                return true;
+            }
+            
+            // Casos específicos de rutas imposibles
+            const impossibleRoutes = [
+                // Cualquier ruta terrestre entre continentes separados por océanos
+                ['MEX', 'CHN'], ['CHN', 'MEX'],
+                ['MEX', 'GER'], ['GER', 'MEX'],
+                ['MEX', 'NLD'], ['NLD', 'MEX'],
+                ['MEX', 'JPN'], ['JPN', 'MEX'],
+                ['USA', 'CHN'], ['CHN', 'USA'],
+                ['USA', 'GER'], ['GER', 'USA'],
+                ['USA', 'NLD'], ['NLD', 'USA'],
+                ['USA', 'JPN'], ['JPN', 'USA'],
+                ['GER', 'CHN'], ['CHN', 'GER'],
+                ['GER', 'JPN'], ['JPN', 'GER'],
+                ['NLD', 'CHN'], ['CHN', 'NLD'],
+                ['NLD', 'JPN'], ['JPN', 'NLD'],
+                ['CHN', 'JPN'], ['JPN', 'CHN'] // Separados por mar
+            ];
+            
+            return impossibleRoutes.some(route => 
+                route[0] === origin && route[1] === destination
+            );
+        }
+
+        // Función para analizar una ruta
+        function analyzeRoute(routeKey, routeData) {
+            const [origin, destination] = routeKey.split('-');
+            const results = [];
+
+            Object.keys(routeData).forEach(transportType => {
+                const coordinates = routeData[transportType];
+                const routeDistance = calculateRouteDistance(coordinates);
+                
+                // Calcular distancia directa entre países
+                const originCoords = countryCenters[origin];
+                const destCoords = countryCenters[destination];
+                const directDistance = calculateDistance(
+                    originCoords[0], originCoords[1],
+                    destCoords[0], destCoords[1]
+                );
+
+                // Determinar el estado de la ruta
+                let status = 'ok';
+                let observations = [];
+                
+                // Calcular factor siempre (necesario para la tabla)
+                const factor = routeDistance / directDistance;
+                
+                // Verificar si es una ruta terrestre imposible
+                if (transportType === 'terrestre' && isImpossibleTerrestrialRoute(origin, destination)) {
+                    status = 'impossible';
+                    observations.push('Ruta terrestre geográficamente imposible - requiere cruzar océanos');
+                } else {
+                    // Factores de multiplicación esperados por tipo de transporte
+                    const expectedFactors = {
+                        'terrestre': { min: 1.2, max: 2.5 },
+                        'maritima': { min: 1.5, max: 4.0 },
+                        'aerea': { min: 1.0, max: 1.3 }
+                    };
+
+                    const expected = expectedFactors[transportType];
+
+                    if (factor < expected.min) {
+                        status = 'error';
+                        observations.push(`Distancia muy corta (${factor.toFixed(1)}x vs ${expected.min}-${expected.max}x esperado)`);
+                    } else if (factor > expected.max) {
+                        status = 'warning';
+                        observations.push(`Distancia muy larga (${factor.toFixed(1)}x vs ${expected.min}-${expected.max}x esperado)`);
+                    }
+
+                    // Verificar si las coordenadas están en ubicaciones lógicas
+                    if (transportType === 'maritima') {
+                        // Las rutas marítimas deberían pasar por puertos
+                        let hasPort = false;
+                        coordinates.forEach(coord => {
+                            // Verificar si está cerca de la costa (simplificado)
+                            if (Math.abs(coord[1]) > 0.5) { // Longitud no muy cercana a Greenwich
+                                hasPort = true;
+                            }
+                        });
+                        if (!hasPort && origin !== destination) {
+                            observations.push('Posible ruta marítima sin puertos identificados');
+                        }
+                    }
+
+                    // Verificar rutas domésticas
+                    if (origin === destination) {
+                        if (routeDistance > directDistance * 3) {
+                            status = 'warning';
+                            observations.push('Ruta doméstica muy larga');
+                        }
+                    }
+                }
+
+                results.push({
+                    routeKey,
+                    origin,
+                    destination,
+                    transportType,
+                    coordinates,
+                    routeDistance,
+                    directDistance,
+                    factor,
+                    status,
+                    observations
+                });
+            });
+
+            return results;
+        }
+
+        // Función principal para analizar todas las rutas
+        function analyzeAllRoutes() {
+            const allResults = [];
+            let totalRoutes = 0;
+            let okRoutes = 0;
+            let warningRoutes = 0;
+            let errorRoutes = 0;
+            let impossibleRoutes = 0;
+
+            Object.keys(rutasReales).forEach(routeKey => {
+                const routeData = rutasReales[routeKey];
+                const results = analyzeRoute(routeKey, routeData);
+                allResults.push(...results);
+                
+                results.forEach(result => {
+                    totalRoutes++;
+                    switch(result.status) {
+                        case 'ok': okRoutes++; break;
+                        case 'warning': warningRoutes++; break;
+                        case 'error': errorRoutes++; break;
+                        case 'impossible': impossibleRoutes++; break;
+                    }
+                });
+            });
+
+            // Actualizar estadísticas
+            document.getElementById('totalRoutes').textContent = totalRoutes;
+            document.getElementById('okRoutes').textContent = okRoutes;
+            document.getElementById('warningRoutes').textContent = warningRoutes;
+            document.getElementById('errorRoutes').textContent = errorRoutes;
+            document.getElementById('impossibleRoutes').textContent = impossibleRoutes;
+
+            return allResults;
+        }
+
+        // Función para renderizar la tabla
+        function renderTable(results) {
+            const tbody = document.getElementById('routeTableBody');
+            tbody.innerHTML = '';
+
+            results.forEach(result => {
+                const row = document.createElement('tr');
+                row.className = `route-${result.status}`;
+                
+                const routeName = `${countryNames[result.origin] || result.origin} → ${countryNames[result.destination] || result.destination}`;
+                const coordsStr = result.coordinates.map(coord => 
+                    `[${coord[0].toFixed(2)}, ${coord[1].toFixed(2)}]`
+                ).join(', ');
+
+                row.innerHTML = `
+                    <td>${routeName}</td>
+                    <td><span class="transport-type ${result.transportType}">${result.transportType.toUpperCase()}</span></td>
+                    <td>${result.directDistance.toFixed(0)} km</td>
+                    <td>${result.routeDistance.toFixed(0)} km</td>
+                    <td>${result.factor.toFixed(1)}x</td>
+                    <td><span class="status status-${result.status}">${
+                        result.status === 'ok' ? 'Correcto' : 
+                        result.status === 'warning' ? 'Dudoso' : 
+                        result.status === 'error' ? 'Erróneo' : 'Imposible'
+                    }</span></td>
+                    <td class="coordinates">${coordsStr}</td>
+                    <td>${result.observations.join('. ')}</td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+        }
+
+        // Función para filtrar resultados
+        function filterResults(allResults) {
+            const statusFilter = document.getElementById('statusFilter').value;
+            const transportFilter = document.getElementById('transportFilter').value;
+            
+            let filtered = allResults;
+            
+            if (statusFilter !== 'all') {
+                filtered = filtered.filter(result => result.status === statusFilter);
+            }
+            
+            if (transportFilter !== 'all') {
+                filtered = filtered.filter(result => result.transportType === transportFilter);
+            }
+            
+            return filtered;
+        }
+
+        // Inicializar la aplicación
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(() => {
+                const allResults = analyzeAllRoutes();
+                
+                // Configurar filtros
+                document.getElementById('statusFilter').addEventListener('change', () => {
+                    const filtered = filterResults(allResults);
+                    renderTable(filtered);
+                });
+                
+                document.getElementById('transportFilter').addEventListener('change', () => {
+                    const filtered = filterResults(allResults);
+                    renderTable(filtered);
+                });
+                
+                // Renderizar tabla inicial
+                renderTable(allResults);
+                
+                // Mostrar contenido
+                document.getElementById('loadingMessage').style.display = 'none';
+                document.getElementById('content').style.display = 'block';
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
