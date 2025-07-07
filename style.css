@@ -192,3 +192,344 @@ footer {
     background: #f3e5f5;
     color: #7b1fa2;
 }
+
+/* Estilos para opciones de transporte */
+.transport-options {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.transport-options h2 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    color: #1a73e8;
+    font-size: 1.3rem;
+}
+
+#transportButtons {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.transport-button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1rem;
+    background: #fff;
+    color: #1a73e8;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+    min-width: 160px;
+    font-size: 0.9rem;
+    position: relative;
+}
+
+.transport-button:hover {
+    border-color: #1a73e8;
+    background: #f8f9fa;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(26, 115, 232, 0.15);
+}
+
+.transport-button.selected {
+    border-color: #1a73e8;
+    background: #e8f0fe;
+    color: #1a73e8;
+}
+
+.transport-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.5rem;
+}
+
+.environmental-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    margin-right: 0.5rem;
+}
+
+.environmental-indicator.low {
+    background-color: #28a745;
+}
+
+.environmental-indicator.medium {
+    background-color: #ffc107;
+}
+
+.environmental-indicator.high {
+    background-color: #dc3545;
+}
+
+.transport-icon {
+    font-size: 1.8rem;
+}
+
+.transport-name {
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.3rem;
+}
+
+.transport-route {
+    font-size: 0.75rem;
+    color: #495057;
+    margin-bottom: 0.4rem;
+    text-align: center;
+    line-height: 1.2;
+    font-weight: 500;
+}
+
+.environmental-info {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.2rem;
+}
+
+.environmental-text {
+    font-size: 0.75rem;
+    color: #666;
+}
+
+.environmental-details {
+    font-size: 0.7rem;
+    color: #888;
+    font-weight: 500;
+}
+
+/* Estilos para detalles de transporte */
+.transport-details {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background: #fff;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+#cargoOptions {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+}
+
+#cargoOptions h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    color: #1a73e8;
+    font-size: 1.1rem;
+}
+
+#cargoDetailsContainer {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #fff;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+}
+
+#calculateCost {
+    margin-top: 1rem;
+    background: #28a745;
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+#calculateCost:hover {
+    background: #218838;
+}
+
+/* Estilos para resultado de costo */
+#costResult {
+    margin-top: 1.5rem;
+    padding: 1.5rem;
+    background: #e8f5e8;
+    border-radius: 8px;
+    border: 1px solid #c3e6cb;
+}
+
+#costResult h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    color: #155724;
+    font-size: 1.2rem;
+}
+
+.route-summary, .cost-details {
+    background: #fff;
+    padding: 1rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    border: 1px solid #c3e6cb;
+}
+
+.environmental-impact {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    border: 1px solid #e9ecef;
+}
+
+.route-summary h4, .cost-details h4, .environmental-impact h4 {
+    margin-top: 0;
+    margin-bottom: 0.75rem;
+    color: #155724;
+    font-size: 1rem;
+}
+
+.environmental-impact h4 {
+    color: #495057;
+}
+
+.route-summary p, .cost-details p, .environmental-impact p {
+    margin: 0.5rem 0;
+    font-size: 0.95rem;
+}
+
+/* Estilos para información de capacidad de contenedores */
+.capacity-info {
+    margin-top: 0.5rem;
+    padding: 0.75rem;
+    border-radius: 6px;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+}
+
+.capacity-display {
+    margin-bottom: 0.5rem;
+    padding: 0.5rem;
+    border-radius: 4px;
+    font-size: 0.95rem;
+}
+
+.capacity-display.capacity-ok {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+}
+
+.capacity-display.capacity-warning {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    color: #856404;
+}
+
+.capacity-display.capacity-exceeded {
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+}
+
+.capacity-status {
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.capacity-explanation {
+    margin-top: 0.5rem;
+    padding: 0.25rem;
+    color: #6c757d;
+    font-style: italic;
+}
+
+.capacity-explanation small {
+    font-size: 0.8rem;
+    line-height: 1.3;
+}
+
+/* Ajustar estilos de los grupos de formulario para contenedores */
+#containerSizeGroup, #containerQuantityGroup {
+    transition: all 0.3s ease;
+}
+
+#containerSizeGroup[style*="display:none"], 
+#containerQuantityGroup[style*="display:none"] {
+    opacity: 0;
+    transform: translateY(-10px);
+}
+
+#containerSizeGroup:not([style*="display:none"]), 
+#containerQuantityGroup:not([style*="display:none"]) {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Estilos para el desglose del flete marítimo */
+.maritime-freight-breakdown {
+    background: #f8f9ff;
+    border: 1px solid #e3f2fd;
+    border-radius: 6px;
+    padding: 1rem;
+    margin-top: 1rem;
+}
+
+.maritime-freight-breakdown h5 {
+    color: #1565c0;
+    margin: 0 0 0.75rem 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.freight-details {
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.freight-details p {
+    margin: 0.25rem 0;
+}
+
+.freight-details strong {
+    color: #1565c0;
+}
+
+.help-text {
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 0.25rem;
+    display: block;
+}
+
+/* Responsive design para dispositivos móviles */
+@media (max-width: 768px) {
+    #transportButtons {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .transport-button {
+        width: 100%;
+        max-width: 200px;
+    }
+    
+    .transport-details {
+        padding: 1rem;
+    }
+    
+    #cargoOptions {
+        padding: 0.75rem;
+    }
+}

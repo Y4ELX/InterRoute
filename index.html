@@ -23,8 +23,8 @@
                         <option value="Estados_Unidos">Estados Unidos</option>
                         <option value="China">China</option>
                         <option value="Alemania">Alemania</option>
-                        <option value="Japon">Japón</option>
                         <option value="Paises_Bajos">Países Bajos</option>
+                        <option value="Corea">Corea del Sur</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -35,46 +35,37 @@
                         <option value="Estados_Unidos">Estados Unidos</option>
                         <option value="China">China</option>
                         <option value="Alemania">Alemania</option>
-                        <option value="Japon">Japón</option>
                         <option value="Paises_Bajos">Países Bajos</option>
+                        <option value="Corea">Corea del Sur</option>
                     </select>
                 </div>
-                <div class="form-group">
-                    <label for="cargoType">Tipo de mercancía</label>
-                    <select id="cargoType" name="cargoType" required>
-                        <option value="">Seleccione tipo</option>
-                        <option value="suelta">Carga suelta</option>
-                        <option value="contenedor">Contenerizada</option>
-                    </select>
-                </div>
-                <div class="form-group" id="containerTypeGroup" style="display:none;">
-                    <label for="containerType">Tipo de contenedor</label>
-                    <select id="containerType" name="containerType">
-                        <option value="">Seleccione contenedor</option>
-                        <option value="dryvan">Dry Van</option>
-                        <option value="highcube">High Cube</option>
-                        <option value="reefer">Reefer</option>
-                    </select>
-                </div>
-                <div class="form-group" id="containerQuantityGroup" style="display:none;">
-                    <label for="containerQuantity">Cantidad de contenedores</label>
-                    <input type="number" id="containerQuantity" name="containerQuantity" min="1" max="100" placeholder="Ej: 5">
-                </div>
-                <div class="form-group" id="netWeightGroup" style="display:none;">
-                    <label for="netWeight">Peso neto (kg)</label>
-                    <input type="number" id="netWeight" name="netWeight" min="1" max="50000" placeholder="Ej: 2000">
-                </div>
-                <div class="form-group" id="grossWeightGroup" style="display:none;">
-                    <label for="grossWeight">Peso bruto (kg)</label>
-                    <input type="number" id="grossWeight" name="grossWeight" min="1" max="50000" placeholder="Ej: 2500">
-                </div>
-                <button type="submit">Sugerir rutas</button>
+                <button type="submit">Buscar opciones de transporte</button>
             </form>
         </section>
-        <section id="routesSection" class="routes-section" style="display:none;">
-            <h2>Rutas sugeridas</h2>
+        
+        <!-- Sección de opciones de transporte -->
+        <section id="transportOptions" class="transport-options" style="display:none;">
+            <h2>Opciones de transporte disponibles</h2>
+            <div id="transportButtons"></div>
+        </section>
+        
+        <!-- Sección de detalles de transporte seleccionado -->
+        <section id="transportDetails" class="transport-details" style="display:none;">
             <div id="mapContainer" style="height: 400px; margin-bottom: 1rem; border-radius: 8px; overflow: hidden;"></div>
-            <div id="routesContainer"></div>
+            
+            <!-- Opciones de carga específicas por tipo de transporte -->
+            <div id="cargoOptions">
+                <h3>Detalles de la carga</h3>
+                <div id="cargoTypeContainer"></div>
+                <div id="cargoDetailsContainer"></div>
+                <button id="calculateCost" type="button">Calcular costo</button>
+            </div>
+            
+            <!-- Resultado del cálculo -->
+            <div id="costResult" style="display:none;">
+                <h3>Información de la ruta</h3>
+                <div id="routeInfo"></div>
+            </div>
         </section>
     </main>
     <footer>

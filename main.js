@@ -1,7 +1,8 @@
 // InterRoute - main.js
 let map;
 let routeLayerGroup;
-let selectedRouteIndex = -1;
+let currentRoute = null;
+let currentTransportType = null;
 
 // Configuración del mapa
 function initMap() {
@@ -14,41 +15,15 @@ function initMap() {
     routeLayerGroup = L.layerGroup().addTo(map);
 }
 
-// Función para mostrar/ocultar los selectores según el tipo de carga
-function toggleCargoFields() {
-    const cargoType = document.getElementById('cargoType').value;
-    const containerGroup = document.getElementById('containerTypeGroup');
-    const containerQuantityGroup = document.getElementById('containerQuantityGroup');
-    const netWeightGroup = document.getElementById('netWeightGroup');
-    const grossWeightGroup = document.getElementById('grossWeightGroup');
-    
-    // Ocultar todos los campos primero
-    containerGroup.style.display = 'none';
-    containerQuantityGroup.style.display = 'none';
-    netWeightGroup.style.display = 'none';
-    grossWeightGroup.style.display = 'none';
-    
-    if (cargoType === 'contenedor') {
-        // Mostrar campos de contenedor
-        containerGroup.style.display = 'block';
-        containerQuantityGroup.style.display = 'block';
-    } else if (cargoType === 'suelta') {
-        // Mostrar campos de peso para carga suelta
-        netWeightGroup.style.display = 'block';
-        grossWeightGroup.style.display = 'block';
-    }
-}
-
 // Función para encontrar la clave de ruta en rutasReales
 function findRouteKey(origin, destination) {
-    // Mapeo de nombres de países a abreviaciones
     const countryMapping = {
         'Mexico': 'MEX',
         'Estados_Unidos': 'USA',
         'China': 'CHN',
         'Alemania': 'GER',
-        'Japon': 'JPN',
-        'Paises_Bajos': 'NLD'
+        'Paises_Bajos': 'NLD',
+        'Corea': 'KOR'
     };
     
     const originCode = countryMapping[origin];
@@ -62,6 +37,12 @@ function findRouteKey(origin, destination) {
     return rutasReales[routeKey] ? routeKey : null;
 }
 
+// Función para determinar si una ruta terrestre es viable
+function isLandRouteViable(origin, destination) {
+    return (origin === 'Mexico' && destination === 'Estados_Unidos') || 
+           (origin === 'Estados_Unidos' && destination === 'Mexico');
+}
+
 // Función para obtener color por tipo de transporte
 function getTransportColor(type) {
     const colors = {
@@ -72,64 +53,175 @@ function getTransportColor(type) {
     return colors[type] || '#333';
 }
 
-// Función para obtener información de costos y tiempos estimados
-function getRouteInfo(origin, destination, transportType, cargoType, containerType, containerQuantity, netWeight, grossWeight) {
-    const distances = {
-        'terrestre': { base: 2000, multiplier: 1.0 },
-        'maritima': { base: 8000, multiplier: 1.5 },
-        'aerea': { base: 12000, multiplier: 0.3 }
+// Función para calcular la distancia entre dos puntos (fórmula de Haversine)
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Radio de la Tierra en kilómetros
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+}
+
+// Función para calcular la distancia total de una ruta
+function calculateRouteDistance(coordinates) {
+    if (!coordinates || coordinates.length < 2) return 0;
+    
+    let totalDistance = 0;
+    for (let i = 0; i < coordinates.length - 1; i++) {
+        totalDistance += calculateDistance(
+            coordinates[i][0], coordinates[i][1],
+            coordinates[i+1][0], coordinates[i+1][1]
+        );
+    }
+    return totalDistance;
+}
+
+// Función para calcular el impacto ambiental
+function calculateEnvironmentalImpact(transportType, coordinates) {
+    const distance = calculateRouteDistance(coordinates);
+    
+    // Factores de emisión de CO2 por kilómetro (basados en datos reales)
+    const emissionFactors = {
+        'terrestre': 0.12,  // kg CO2/km (camiones)
+        'maritima': 0.015,  // kg CO2/km (barcos cargueros)
+        'aerea': 0.25       // kg CO2/km (aviones de carga)
     };
     
-    const baseCost = distances[transportType].base;
-    const timeMultiplier = distances[transportType].multiplier;
+    // Calcular emisiones totales
+    const totalEmissions = emissionFactors[transportType] * distance;
     
-    // Ajustar costos según tipo de carga
-    let costMultiplier = 1.0;
-    let cargoDetails = '';
-    
-    if (cargoType === 'contenedor') {
-        const quantity = parseInt(containerQuantity) || 1;
-        costMultiplier = 1.5 * quantity;
-        
-        if (containerType === 'reefer') {
-            costMultiplier *= 2.0;
-        } else if (containerType === 'highcube') {
-            costMultiplier *= 1.3;
-        }
-        
-        cargoDetails = `${quantity} ${containerType === 'dryvan' ? 'Dry Van' : 
-                                    containerType === 'highcube' ? 'High Cube' : 'Reefer'}${quantity > 1 ? 's' : ''}`;
-        
-    } else if (cargoType === 'suelta') {
-        const weightKg = parseFloat(grossWeight) || 1000;
-        const weightTons = weightKg / 1000;
-        
-        // Costo basado en peso bruto
-        costMultiplier = Math.max(1.0, weightTons * 0.8);
-        
-        cargoDetails = `Peso neto: ${parseFloat(netWeight).toLocaleString()} kg, Peso bruto: ${parseFloat(grossWeight).toLocaleString()} kg`;
+    // Clasificar impacto según emisiones
+    let impact, impactText;
+    if (totalEmissions < 500) {
+        impact = 'low';
+        impactText = 'Bajo';
+    } else if (totalEmissions < 1500) {
+        impact = 'medium';
+        impactText = 'Medio';
+    } else {
+        impact = 'high';
+        impactText = 'Alto';
     }
     
-    const estimatedCost = Math.round(baseCost * costMultiplier);
-    const estimatedTime = Math.round(timeMultiplier * 10);
-    
     return {
-        cost: estimatedCost,
-        time: estimatedTime,
-        impact: estimatedCost < 3000 ? 'low' : estimatedCost < 6000 ? 'medium' : 'high',
-        cargoDetails: cargoDetails
+        level: impact,
+        text: impactText,
+        emissions: Math.round(totalEmissions),
+        distance: Math.round(distance)
     };
+}
+
+// Función para mostrar opciones de transporte disponibles
+function showTransportOptions(origin, destination) {
+    const routeKey = findRouteKey(origin, destination);
+    
+    if (!routeKey) {
+        document.getElementById('transportButtons').innerHTML = 
+            '<p>No se encontraron rutas disponibles para esta combinación.</p>';
+        return;
+    }
+    
+    const routeData = rutasReales[routeKey];
+    const transportButtons = document.getElementById('transportButtons');
+    transportButtons.innerHTML = '';
+    
+    // Crear botones para cada tipo de transporte disponible
+    Object.keys(routeData).forEach(transportType => {
+        // Verificar si la ruta terrestre es viable
+        if (transportType === 'terrestre') {
+            if (!isLandRouteViable(origin, destination)) {
+                return;
+            }
+            // Verificar coordenadas válidas
+            const coordinates = routeData[transportType];
+            if (coordinates.length === 1 && coordinates[0][0] === 0 && coordinates[0][1] === 0) {
+                return;
+            }
+        }
+        
+        const coordinates = routeData[transportType];
+        const environmentalImpact = calculateEnvironmentalImpact(transportType, coordinates);
+        const transportInfo = getTransportInfo(coordinates, transportType);
+        
+        const button = document.createElement('button');
+        button.className = 'transport-button';
+        button.dataset.transportType = transportType;
+        
+        const transportNames = {
+            'terrestre': '🚛 Terrestre',
+            'maritima': '🚢 Marítimo', 
+            'aerea': '✈️ Aéreo'
+        };
+        
+        button.innerHTML = `
+            <div class="transport-header">
+                <span class="transport-icon">${transportNames[transportType]}</span>
+            </div>
+            <span class="transport-route">${transportInfo.origin} → ${transportInfo.destination}</span>
+            <div class="environmental-info">
+                <span class="environmental-indicator ${environmentalImpact.level}"></span>
+                <span class="environmental-text">Impacto: ${environmentalImpact.text}</span>
+            </div>
+            <span class="environmental-details">${environmentalImpact.emissions} kg CO2</span>
+        `;
+        
+        button.addEventListener('click', () => selectTransportType(origin, destination, transportType));
+        transportButtons.appendChild(button);
+    });
+    
+    // Mostrar la sección de opciones de transporte
+    document.getElementById('transportOptions').style.display = 'block';
+}
+
+// Función para mostrar ruta en el mapa
+function showRouteOnMap(origin, destination, transportType) {
+    const routeKey = findRouteKey(origin, destination);
+    if (!routeKey) return;
+    
+    const routeData = rutasReales[routeKey];
+    const coordinates = routeData[transportType];
+    
+    if (!coordinates || coordinates.length < 2) return;
+    
+    // Limpiar capas anteriores
+    routeLayerGroup.clearLayers();
+    
+    // Dibujar la ruta
+    const color = getTransportColor(transportType);
+    const polyline = drawRoute(coordinates, color, transportType);
+    
+    if (polyline) {
+        // Ajustar vista del mapa para mostrar toda la ruta
+        map.fitBounds(polyline.getBounds(), { padding: [20, 20] });
+    }
 }
 
 // Función para dibujar ruta en el mapa
 function drawRoute(coordinates, color, transportType) {
     if (!coordinates || coordinates.length < 2) return null;
     
-    const polyline = L.polyline(coordinates, {
-        color: color,
-        weight: 4,
-        opacity: 0.8
-    }).addTo(routeLayerGroup);
+    let polyline;
+    
+    // Para rutas aéreas, crear una curva
+    if (transportType === 'aerea') {
+        const curvedCoordinates = createCurvedRoute(coordinates);
+        polyline = L.polyline(curvedCoordinates, {
+            color: color,
+            weight: 4,
+            opacity: 0.8,
+            dashArray: '10, 5' // Línea punteada para aviones
+        }).addTo(routeLayerGroup);
+    } else {
+        // Para rutas terrestres y marítimas, usar línea normal
+        polyline = L.polyline(coordinates, {
+            color: color,
+            weight: 4,
+            opacity: 0.8
+        }).addTo(routeLayerGroup);
+    }
     
     // Agregar marcadores de inicio y fin
     const startMarker = L.marker(coordinates[0], {
@@ -169,82 +261,369 @@ function drawRoute(coordinates, color, transportType) {
     return polyline;
 }
 
-// Función para mostrar rutas sugeridas
-function showSuggestedRoutes(origin, destination, cargoType, containerType, containerQuantity, netWeight, grossWeight) {
-    const routeKey = findRouteKey(origin, destination);
+// Función para mostrar opciones de carga específicas según el tipo de transporte
+function showCargoOptions(transportType) {
+    const cargoTypeContainer = document.getElementById('cargoTypeContainer');
+    const cargoDetailsContainer = document.getElementById('cargoDetailsContainer');
     
-    if (!routeKey) {
-        document.getElementById('routesContainer').innerHTML = 
-            '<p>No se encontraron rutas disponibles para esta combinación de origen y destino.</p>';
-        return;
+    cargoTypeContainer.innerHTML = '';
+    cargoDetailsContainer.innerHTML = '';
+    
+    // Crear opciones según el tipo de transporte
+    let cargoOptions = [];
+    
+    if (transportType === 'terrestre') {
+        cargoOptions = [
+            { value: 'suelta', text: 'Carga Suelta' },
+            { value: 'unitarizada', text: 'Unitarizada (Pallets)' }
+        ];
+    } else if (transportType === 'maritima') {
+        cargoOptions = [
+            { value: 'suelta', text: 'Carga Suelta' },
+            { value: 'contenedor', text: 'Contenerizada' }
+        ];
+    } else if (transportType === 'aerea') {
+        cargoOptions = [
+            { value: 'unitarizada', text: 'Unitarizada (Pallets)' }
+        ];
     }
     
-    const routeData = rutasReales[routeKey];
-    const routesContainer = document.getElementById('routesContainer');
-    routesContainer.innerHTML = '';
+    // Crear selector de tipo de carga
+    const cargoTypeSelect = document.createElement('select');
+    cargoTypeSelect.id = 'cargoType';
+    cargoTypeSelect.innerHTML = '<option value="">Seleccione tipo de carga</option>';
     
-    let routeIndex = 0;
+    cargoOptions.forEach(option => {
+        const optionElement = document.createElement('option');
+        optionElement.value = option.value;
+        optionElement.textContent = option.text;
+        cargoTypeSelect.appendChild(optionElement);
+    });
     
-    // Crear tarjetas para cada tipo de transporte disponible
-    Object.keys(routeData).forEach(transportType => {
-        const coordinates = routeData[transportType];
-        const routeInfo = getRouteInfo(origin, destination, transportType, cargoType, containerType, containerQuantity, netWeight, grossWeight);
+    cargoTypeSelect.addEventListener('change', () => showCargoDetails(cargoTypeSelect.value));
+    
+    const label = document.createElement('label');
+    label.textContent = 'Tipo de carga:';
+    label.appendChild(cargoTypeSelect);
+    
+    cargoTypeContainer.appendChild(label);
+}
+
+// Función para mostrar detalles específicos de carga
+function showCargoDetails(cargoType) {
+    const cargoDetailsContainer = document.getElementById('cargoDetailsContainer');
+    cargoDetailsContainer.innerHTML = '';
+    
+    if (cargoType === 'suelta') {
+        // Verificar si es transporte marítimo para agregar campo de volumen
+        const isMaritimeTransport = currentTransportType === 'maritima';
         
-        const routeCard = document.createElement('div');
-        routeCard.className = 'route-card';
-        routeCard.dataset.routeIndex = routeIndex;
-        routeCard.dataset.transportType = transportType;
-        
-        routeCard.innerHTML = `
-            <h3>Ruta ${transportType.charAt(0).toUpperCase() + transportType.slice(1)}</h3>
-            <div class="route-details">
-                <div class="route-type ${transportType}">${transportType.toUpperCase()}</div>
-                <div><strong>Costo estimado:</strong> $${routeInfo.cost.toLocaleString()} USD</div>
-                <div><strong>Tiempo estimado:</strong> ${routeInfo.time} días</div>
-                <div><strong>Impacto ambiental:</strong> <span class="impact-${routeInfo.impact}">${
-                    routeInfo.impact === 'low' ? 'Bajo' : 
-                    routeInfo.impact === 'medium' ? 'Medio' : 'Alto'
-                }</span></div>
-                ${routeInfo.cargoDetails ? `<div><strong>Carga:</strong> ${routeInfo.cargoDetails}</div>` : ''}
+        cargoDetailsContainer.innerHTML = `
+            <div class="form-group">
+                <label for="netWeight">Peso neto (kg):</label>
+                <input type="number" id="netWeight" min="1" required>
+            </div>
+            <div class="form-group">
+                <label for="grossWeight">Peso bruto (kg):</label>
+                <input type="number" id="grossWeight" min="1" required>
+            </div>
+            ${isMaritimeTransport ? `
+            <div class="form-group">
+                <label for="cargoVolume">Volumen (m³):</label>
+                <input type="number" id="cargoVolume" min="0.1" step="0.1" required>
+                <small class="help-text">Requerido para calcular el factor de estiba (FE)</small>
+            </div>
+            ` : ''}
+        `;
+    } else if (cargoType === 'contenedor') {
+        cargoDetailsContainer.innerHTML = `
+            <div class="form-group">
+                <label for="containerType">Tipo de contenedor:</label>
+                <select id="containerType" required>
+                    <option value="">Seleccione tipo</option>
+                    <option value="dryvan">Dry Van</option>
+                    <option value="highcube">High Cube</option>
+                    <option value="reefer">Reefer</option>
+                </select>
+            </div>
+            <div class="form-group" id="containerSizeGroup" style="display:none;">
+                <label for="containerSize">Tamaño del contenedor:</label>
+                <select id="containerSize" required>
+                    <option value="">Seleccione tamaño</option>
+                    <option value="20">20 pies</option>
+                    <option value="40">40 pies</option>
+                </select>
+            </div>
+            <div class="form-group" id="containerQuantityGroup" style="display:none;">
+                <label for="containerQuantity">Cantidad de contenedores:</label>
+                <input type="number" id="containerQuantity" min="1" required>
+                <div id="capacityInfo" class="capacity-info"></div>
             </div>
         `;
         
-        routeCard.addEventListener('click', () => selectRoute(routeIndex, transportType, coordinates));
-        routesContainer.appendChild(routeCard);
-        routeIndex++;
-    });
-    
-    // Mostrar la primera ruta por defecto
-    if (Object.keys(routeData).length > 0) {
-        const firstTransport = Object.keys(routeData)[0];
-        selectRoute(0, firstTransport, routeData[firstTransport]);
+        // Agregar event listeners para actualizar opciones dinámicamente
+        const containerTypeSelect = document.getElementById('containerType');
+        const containerSizeSelect = document.getElementById('containerSize');
+        const containerQuantityInput = document.getElementById('containerQuantity');
+        
+        containerTypeSelect.addEventListener('change', function() {
+            const containerType = this.value;
+            const sizeGroup = document.getElementById('containerSizeGroup');
+            const quantityGroup = document.getElementById('containerQuantityGroup');
+            
+            if (containerType) {
+                sizeGroup.style.display = 'block';
+                // Actualizar opciones de tamaño según el tipo
+                updateContainerSizeOptions(containerType);
+            } else {
+                sizeGroup.style.display = 'none';
+                quantityGroup.style.display = 'none';
+            }
+        });
+        
+        containerSizeSelect.addEventListener('change', function() {
+            const containerSize = this.value;
+            const quantityGroup = document.getElementById('containerQuantityGroup');
+            
+            if (containerSize) {
+                quantityGroup.style.display = 'block';
+                updateContainerCapacity();
+            } else {
+                quantityGroup.style.display = 'none';
+            }
+        });
+        
+        containerQuantityInput.addEventListener('input', function() {
+            updateContainerCapacity();
+        });
+    } else if (cargoType === 'unitarizada') {
+        cargoDetailsContainer.innerHTML = `
+            <div class="form-group">
+                <label for="palletQuantity">Cantidad de pallets:</label>
+                <input type="number" id="palletQuantity" min="1" required>
+            </div>
+            <div class="form-group">
+                <label for="palletWeight">Peso por pallet (kg):</label>
+                <input type="number" id="palletWeight" min="1" required>
+            </div>
+        `;
     }
 }
 
-// Función para seleccionar una ruta específica
-function selectRoute(index, transportType, coordinates) {
-    // Remover selección anterior
-    document.querySelectorAll('.route-card').forEach(card => {
-        card.classList.remove('selected');
+// Función para seleccionar tipo de transporte y mostrar detalles
+function selectTransportType(origin, destination, transportType) {
+    currentRoute = { origin, destination, transportType };
+    currentTransportType = transportType;
+    
+    // Resaltar botón seleccionado
+    document.querySelectorAll('.transport-button').forEach(btn => {
+        btn.classList.remove('selected');
     });
+    document.querySelector(`[data-transport-type="${transportType}"]`).classList.add('selected');
     
-    // Seleccionar nueva ruta
-    const selectedCard = document.querySelector(`[data-route-index="${index}"]`);
-    if (selectedCard) {
-        selectedCard.classList.add('selected');
+    // Mostrar sección de detalles
+    document.getElementById('transportDetails').style.display = 'block';
+    
+    // Inicializar mapa si no existe
+    if (!map) {
+        initMap();
     }
     
-    // Limpiar mapa y dibujar nueva ruta
-    routeLayerGroup.clearLayers();
-    const color = getTransportColor(transportType);
-    const polyline = drawRoute(coordinates, color, transportType);
+    // Mostrar ruta en el mapa
+    showRouteOnMap(origin, destination, transportType);
     
-    if (polyline) {
-        // Ajustar vista del mapa para mostrar toda la ruta
-        map.fitBounds(polyline.getBounds(), { padding: [20, 20] });
+    // Mostrar opciones de carga específicas
+    showCargoOptions(transportType);
+    
+    // Scroll suave hacia los detalles
+    document.getElementById('transportDetails').scrollIntoView({ 
+        behavior: 'smooth' 
+    });
+}
+
+// Función para calcular costos y mostrar información de ruta
+function calculateRouteInfo() {
+    if (!currentRoute) return;
+    
+    const cargoType = document.getElementById('cargoType').value;
+    if (!cargoType) {
+        alert('Por favor seleccione un tipo de carga');
+        return;
     }
     
-    selectedRouteIndex = index;
+    let cargoDetails = '';
+    let costMultiplier = 1.0;
+    let cargoWeight = 1000; // Peso por defecto en kg
+    
+    // Validar datos según tipo de carga
+    if (cargoType === 'suelta') {
+        const netWeight = parseFloat(document.getElementById('netWeight').value);
+        const grossWeight = parseFloat(document.getElementById('grossWeight').value);
+        
+        if (!netWeight || !grossWeight) {
+            alert('Por favor complete todos los campos de peso');
+            return;
+        }
+        
+        if (netWeight > grossWeight) {
+            alert('El peso neto no puede ser mayor al peso bruto');
+            return;
+        }
+        
+        // Validar volumen para transporte marítimo
+        if (currentRoute.transportType === 'maritima') {
+            const cargoVolume = parseFloat(document.getElementById('cargoVolume').value);
+            if (!cargoVolume) {
+                alert('Por favor ingrese el volumen de la carga');
+                return;
+            }
+            cargoDetails = `Peso neto: ${netWeight.toLocaleString()} kg, Peso bruto: ${grossWeight.toLocaleString()} kg, Volumen: ${cargoVolume} m³`;
+        } else {
+            cargoDetails = `Peso neto: ${netWeight.toLocaleString()} kg, Peso bruto: ${grossWeight.toLocaleString()} kg`;
+        }
+        
+        const weightTons = grossWeight / 1000;
+        costMultiplier = Math.max(1.0, weightTons * 0.8);
+        cargoWeight = grossWeight;
+        
+    } else if (cargoType === 'contenedor') {
+        const containerType = document.getElementById('containerType').value;
+        const containerSize = document.getElementById('containerSize').value;
+        const containerQuantity = parseInt(document.getElementById('containerQuantity').value);
+        
+        if (!containerType || !containerSize || !containerQuantity) {
+            alert('Por favor complete todos los campos del contenedor');
+            return;
+        }
+        
+        // Validar capacidad máxima
+        const maxCapacity = getMaxContainerCapacity(containerType, containerSize);
+        if (containerQuantity > maxCapacity) {
+            alert(`La cantidad máxima permitida para contenedores ${containerType} de ${containerSize} pies es ${maxCapacity.toLocaleString()}`);
+            return;
+        }
+        
+        // Calcular multiplicador de costo
+        const baseMultiplier = containerSize === '20' ? 1.0 : 1.8; // 40 pies cuesta más
+        costMultiplier = baseMultiplier * containerQuantity;
+        
+        if (containerType === 'reefer') {
+            costMultiplier *= 2.2; // Reefer es más caro
+        } else if (containerType === 'highcube') {
+            costMultiplier *= 1.4; // High Cube es más caro que Dry Van
+        }
+        
+        // Calcular peso estimado (TEU)
+        const teuPerContainer = containerSize === '20' ? 1 : 2;
+        const totalTEU = containerQuantity * teuPerContainer;
+        
+        const containerNames = {
+            'dryvan': 'DC/GP',    // Dry Cargo / General Purpose
+            'highcube': 'HQ',     // High Cube
+            'reefer': 'RF'        // Reefer
+        };
+        
+        cargoDetails = `${containerQuantity.toLocaleString()}x${containerSize}' ${containerNames[containerType]} (${totalTEU.toLocaleString()} TEU)`;
+        
+        // Ajustar peso para cálculo ambiental (estimado)
+        cargoWeight = totalTEU * 12000; // Aproximadamente 12 toneladas por TEU
+        
+    } else if (cargoType === 'unitarizada') {
+        const palletQuantity = parseInt(document.getElementById('palletQuantity').value);
+        const palletWeight = parseFloat(document.getElementById('palletWeight').value);
+        
+        if (!palletQuantity || !palletWeight) {
+            alert('Por favor complete todos los campos de pallets');
+            return;
+        }
+        
+        const totalWeight = palletQuantity * palletWeight;
+        const weightTons = totalWeight / 1000;
+        costMultiplier = Math.max(1.0, weightTons * 0.6);
+        cargoDetails = `${palletQuantity} pallets, ${palletWeight} kg c/u (Total: ${totalWeight.toLocaleString()} kg)`;
+        cargoWeight = totalWeight;
+    }
+      // Obtener coordenadas de la ruta actual
+    const routeKey = findRouteKey(currentRoute.origin, currentRoute.destination);
+    const routeData = rutasReales[routeKey];
+    const coordinates = routeData[currentRoute.transportType];
+    
+    // Calcular impacto ambiental basado en la ruta real
+    const environmentalImpact = calculateEnvironmentalImpact(currentRoute.transportType, coordinates);
+    
+    // Calcular costo según tipo de transporte
+    let estimatedCost;
+    let costBreakdown = '';
+    
+    if (currentRoute.transportType === 'maritima' && cargoType === 'suelta') {
+        // Cálculo específico para flete marítimo con carga suelta
+        const cargoVolume = parseFloat(document.getElementById('cargoVolume').value);
+        const result = calculateMaritimeFreight(cargoWeight, cargoVolume, cargoDetails);
+        estimatedCost = result.totalCost;
+        costBreakdown = result.breakdown;
+    } else {
+        // Cálculo estándar para otros tipos de transporte
+        const baseCosts = {
+            'terrestre': 2000,
+            'maritima': 8000,
+            'aerea': 12000
+        };
+        
+        const baseCost = baseCosts[currentRoute.transportType];
+        estimatedCost = Math.round(baseCost * costMultiplier);
+    }
+    
+    const timeMultipliers = {
+        'terrestre': 1.0,
+        'maritima': 1.5,
+        'aerea': 0.3
+    };
+    
+    const timeMultiplier = timeMultipliers[currentRoute.transportType];
+    const estimatedTime = Math.round(timeMultiplier * 10);
+    
+    // Mostrar resultados
+    const routeInfo = document.getElementById('routeInfo');
+    routeInfo.innerHTML = `
+        <div class="route-summary">
+            <h4>Resumen de la ruta</h4>
+            <p><strong>Origen:</strong> ${getCountryName(currentRoute.origin)}</p>
+            <p><strong>Destino:</strong> ${getCountryName(currentRoute.destination)}</p>
+            <p><strong>Tipo de transporte:</strong> ${currentRoute.transportType.toUpperCase()}</p>
+            <p><strong>Tipo de carga:</strong> ${cargoDetails}</p>
+            <p><strong>Distancia:</strong> ${environmentalImpact.distance.toLocaleString()} km</p>
+        </div>
+        
+        <div class="cost-details">
+            <h4>Información de costos</h4>
+            <p><strong>Costo estimado:</strong> $${estimatedCost.toLocaleString()} USD</p>
+            <p><strong>Tiempo estimado:</strong> ${estimatedTime} días</p>
+            ${costBreakdown}
+        </div>
+        
+        <div class="environmental-impact">
+            <h4>Impacto ambiental</h4>
+            <p><strong>Nivel de impacto:</strong> <span class="impact-${environmentalImpact.level}">${environmentalImpact.text}</span></p>
+            <p><strong>Emisiones de CO2:</strong> ${environmentalImpact.emissions.toLocaleString()} kg</p>
+            <p><strong>Emisiones por km:</strong> ${(environmentalImpact.emissions / environmentalImpact.distance).toFixed(2)} kg CO2/km</p>
+        </div>
+    `;
+    
+    document.getElementById('costResult').style.display = 'block';
+    document.getElementById('costResult').scrollIntoView({ behavior: 'smooth' });
+}
+
+// Función para obtener nombre del país
+function getCountryName(countryCode) {
+    const countryNames = {
+        'Mexico': 'México',
+        'Estados_Unidos': 'Estados Unidos',
+        'China': 'China',
+        'Alemania': 'Alemania',
+        'Paises_Bajos': 'Países Bajos',
+        'Corea': 'Corea del Sur'
+    };
+    return countryNames[countryCode] || countryCode;
 }
 
 // Función para manejar el envío del formulario
@@ -253,14 +632,9 @@ function handleFormSubmit(e) {
     
     const origin = document.getElementById('origin').value;
     const destination = document.getElementById('destination').value;
-    const cargoType = document.getElementById('cargoType').value;
-    const containerType = document.getElementById('containerType').value;
-    const containerQuantity = document.getElementById('containerQuantity').value;
-    const netWeight = document.getElementById('netWeight').value;
-    const grossWeight = document.getElementById('grossWeight').value;
     
-    if (!origin || !destination || !cargoType) {
-        alert('Por favor, complete todos los campos requeridos.');
+    if (!origin || !destination) {
+        alert('Por favor, seleccione origen y destino.');
         return;
     }
     
@@ -269,53 +643,420 @@ function handleFormSubmit(e) {
         return;
     }
     
-    // Validaciones específicas por tipo de carga
-    if (cargoType === 'contenedor') {
-        if (!containerType || !containerQuantity) {
-            alert('Por favor, seleccione el tipo de contenedor y especifique la cantidad.');
-            return;
-        }
-        if (containerQuantity < 1 || containerQuantity > 100) {
-            alert('La cantidad de contenedores debe estar entre 1 y 100.');
-            return;
-        }
-    } else if (cargoType === 'suelta') {
-        if (!netWeight || !grossWeight) {
-            alert('Por favor, especifique el peso neto y el peso bruto de la carga.');
-            return;
-        }
-        if (parseFloat(netWeight) <= 0 || parseFloat(grossWeight) <= 0) {
-            alert('Los pesos deben ser mayores a 0.');
-            return;
-        }
-        if (parseFloat(netWeight) > parseFloat(grossWeight)) {
-            alert('El peso neto no puede ser mayor al peso bruto.');
-            return;
-        }
+    // Validar que al menos uno de los países sea México
+    if (origin !== 'Mexico' && destination !== 'Mexico') {
+        alert('Al menos uno de los países debe ser México.');
+        return;
     }
     
-    // Mostrar sección de rutas
-    document.getElementById('routesSection').style.display = 'block';
+    // Limpiar secciones anteriores
+    document.getElementById('transportOptions').style.display = 'none';
+    document.getElementById('transportDetails').style.display = 'none';
+    document.getElementById('costResult').style.display = 'none';
     
-    // Inicializar mapa si no existe
-    if (!map) {
-        initMap();
-    }
+    // Mostrar opciones de transporte
+    showTransportOptions(origin, destination);
     
-    // Mostrar rutas sugeridas
-    showSuggestedRoutes(origin, destination, cargoType, containerType, containerQuantity, netWeight, grossWeight);
-    
-    // Scroll suave hacia las rutas
-    document.getElementById('routesSection').scrollIntoView({ 
+    // Scroll suave hacia las opciones de transporte
+    document.getElementById('transportOptions').scrollIntoView({ 
         behavior: 'smooth' 
     });
+}
+
+// Función para actualizar las opciones de destino según el origen seleccionado
+function updateDestinationOptions() {
+    const origin = document.getElementById('origin').value;
+    const destination = document.getElementById('destination');
+    const currentDestination = destination.value;
+    
+    // Limpiar opciones de destino
+    destination.innerHTML = '<option value="">Seleccione país</option>';
+    
+    // Lista de países disponibles
+    const countries = [
+        { value: 'Mexico', text: 'México' },
+        { value: 'Estados_Unidos', text: 'Estados Unidos' },
+        { value: 'China', text: 'China' },
+        { value: 'Alemania', text: 'Alemania' },
+        { value: 'Paises_Bajos', text: 'Países Bajos' },
+        { value: 'Corea', text: 'Corea del Sur' }
+    ];
+    
+    // Si el origen es México, mostrar todos los demás países
+    if (origin === 'Mexico') {
+        countries.forEach(country => {
+            if (country.value !== 'Mexico') {
+                const option = document.createElement('option');
+                option.value = country.value;
+                option.textContent = country.text;
+                destination.appendChild(option);
+            }
+        });
+    }
+    // Si el origen NO es México, solo mostrar México como destino
+    else if (origin && origin !== '') {
+        const option = document.createElement('option');
+        option.value = 'Mexico';
+        option.textContent = 'México';
+        destination.appendChild(option);
+    }
+    // Si no hay origen seleccionado, mostrar todos
+    else {
+        countries.forEach(country => {
+            const option = document.createElement('option');
+            option.value = country.value;
+            option.textContent = country.text;
+            destination.appendChild(option);
+        });
+    }
+    
+    // Mantener la selección anterior si es válida
+    if (currentDestination && [...destination.options].some(opt => opt.value === currentDestination)) {
+        destination.value = currentDestination;
+    }
+}
+
+// Función para actualizar las opciones de origen según el destino seleccionado
+function updateOriginOptions() {
+    const destination = document.getElementById('destination').value;
+    const origin = document.getElementById('origin');
+    const currentOrigin = origin.value;
+    
+    // Limpiar opciones de origen
+    origin.innerHTML = '<option value="">Seleccione país</option>';
+    
+    // Lista de países disponibles
+    const countries = [
+        { value: 'Mexico', text: 'México' },
+        { value: 'Estados_Unidos', text: 'Estados Unidos' },
+        { value: 'China', text: 'China' },
+        { value: 'Alemania', text: 'Alemania' },
+        { value: 'Paises_Bajos', text: 'Países Bajos' },
+        { value: 'Corea', text: 'Corea del Sur' }
+    ];
+    
+    // Si el destino es México, mostrar todos los demás países
+    if (destination === 'Mexico') {
+        countries.forEach(country => {
+            if (country.value !== 'Mexico') {
+                const option = document.createElement('option');
+                option.value = country.value;
+                option.textContent = country.text;
+                origin.appendChild(option);
+            }
+        });
+    }
+    // Si el destino NO es México, solo mostrar México como origen
+    else if (destination && destination !== '') {
+        const option = document.createElement('option');
+        option.value = 'Mexico';
+        option.textContent = 'México';
+        origin.appendChild(option);
+    }
+    // Si no hay destino seleccionado, mostrar todos
+    else {
+        countries.forEach(country => {
+            const option = document.createElement('option');
+            option.value = country.value;
+            option.textContent = country.text;
+            origin.appendChild(option);
+        });
+    }
+    
+    // Mantener la selección anterior si es válida
+    if (currentOrigin && [...origin.options].some(opt => opt.value === currentOrigin)) {
+        origin.value = currentOrigin;
+    }
+}
+
+// Función para actualizar opciones de tamaño según el tipo de contenedor
+function updateContainerSizeOptions(containerType) {
+    const containerSizeSelect = document.getElementById('containerSize');
+    containerSizeSelect.innerHTML = '<option value="">Seleccione tamaño</option>';
+    
+    // Todos los tipos de contenedores tienen opciones de 20 y 40 pies
+    const option20 = document.createElement('option');
+    option20.value = '20';
+    option20.textContent = '20 pies';
+    containerSizeSelect.appendChild(option20);
+    
+    const option40 = document.createElement('option');
+    option40.value = '40';
+    option40.textContent = '40 pies';
+    containerSizeSelect.appendChild(option40);
+}
+
+// Función para calcular la capacidad máxima según el tipo y tamaño
+function getMaxContainerCapacity(containerType, containerSize) {
+    const capacities = {
+        'dryvan': {
+            '20': 10000,
+            '40': 5000
+        },
+        'highcube': {
+            '20': 10000,  // High Cube 20' tiene la misma capacidad que Dry Van 20'
+            '40': 5000    // High Cube 40' tiene la misma capacidad que Dry Van 40'
+        },
+        'reefer': {
+            '20': 1000,
+            '40': 500
+        }
+    };
+    
+    return capacities[containerType]?.[containerSize] || 0;
+}
+
+// Función para actualizar la información de capacidad
+function updateContainerCapacity() {
+    const containerType = document.getElementById('containerType').value;
+    const containerSize = document.getElementById('containerSize').value;
+    const containerQuantity = parseInt(document.getElementById('containerQuantity').value) || 0;
+    const capacityInfo = document.getElementById('capacityInfo');
+    
+    if (!containerType || !containerSize) {
+        capacityInfo.innerHTML = '';
+        return;
+    }
+    
+    const maxCapacity = getMaxContainerCapacity(containerType, containerSize);
+    const containerQuantityInput = document.getElementById('containerQuantity');
+    
+    // Actualizar el máximo permitido
+    containerQuantityInput.max = maxCapacity;
+    
+    // Mostrar información de capacidad
+    let statusClass = 'capacity-ok';
+    let statusText = 'Disponible';
+    
+    if (containerQuantity > maxCapacity) {
+        statusClass = 'capacity-exceeded';
+        statusText = 'Excede capacidad';
+    } else if (containerQuantity > maxCapacity * 0.8) {
+        statusClass = 'capacity-warning';
+        statusText = 'Capacidad alta';
+    }
+    
+    const containerTypeNames = {
+        'dryvan': 'DC/GP',
+        'highcube': 'HQ',
+        'reefer': 'RF'
+    };
+    
+    capacityInfo.innerHTML = `
+        <div class="capacity-display ${statusClass}">
+            <strong>${containerTypeNames[containerType]} ${containerSize}':</strong> 
+            ${containerQuantity}/${maxCapacity} contenedores
+            <span class="capacity-status">(${statusText})</span>
+        </div>
+        <div class="capacity-explanation">
+            <small>Capacidad máxima del barco: ${maxCapacity.toLocaleString()} contenedores de ${containerSize} pies ${containerType === 'reefer' ? 'refrigerados' : ''}</small>
+        </div>
+    `;
+}
+
+// Función para obtener información de puertos/aeropuertos/cruces fronterizos según coordenadas
+function getTransportInfo(coordinates, transportType) {
+    if (!coordinates || coordinates.length < 2) return { origin: '', destination: '' };
+    
+    const originCoord = coordinates[0];
+    const destinationCoord = coordinates[coordinates.length - 1];
+    
+    // Definir ubicaciones principales con sus coordenadas aproximadas
+    const locations = {
+        // México - Puertos
+        'altamira_port': { name: 'Puerto de Altamira', coords: [22.4883, -97.8580] },
+        // México - Aeropuertos
+        'mexico_airport': { name: 'AICM Ciudad de México', coords: [19.4363, -99.0721] },
+        // México - Frontera terrestre
+        'nuevo_laredo': { name: 'Nuevo Laredo, Tamaulipas', coords: [25.6866, -100.3161] },
+        
+        // China - Puertos
+        'shanghai_port': { name: 'Puerto de Shanghái', coords: [31.2304, 121.4737] },
+        // China - Aeropuertos  
+        'shanghai_airport': { name: 'Aeropuerto Shanghái-Pudong', coords: [31.2304, 121.4737] },
+        
+        // Estados Unidos - Puertos
+        'los_angeles_port': { name: 'Puerto de Los Ángeles', coords: [34.0522, -118.2437] },
+        // Estados Unidos - Aeropuertos
+        'los_angeles_airport': { name: 'Aeropuerto LAX Los Ángeles', coords: [34.0522, -118.2437] },
+        // Estados Unidos - Frontera terrestre
+        'laredo': { name: 'Laredo, Texas', coords: [32.7767, -96.797] },
+        
+        // Alemania - Puertos
+        'hamburgo_port': { name: 'Puerto de Hamburgo', coords: [53.5453, 9.9866] },
+        // Alemania - Aeropuertos
+        'frankfurt_airport': { name: 'Aeropuerto de Frankfurt', coords: [53.5453, 9.9866] },
+        
+        // Países Bajos - Puertos
+        'rotterdam_port': { name: 'Puerto de Róterdam', coords: [51.885, 4.2867] },
+        // Países Bajos - Aeropuertos
+        'amsterdam_airport': { name: 'Aeropuerto Ámsterdam-Schiphol', coords: [51.885, 4.2867] },
+        
+        // Corea del Sur - Puertos
+        'busan_port': { name: 'Puerto de Busan', coords: [35.1796, 129.0756] },
+        // Corea del Sur - Aeropuertos
+        'busan_airport': { name: 'Aeropuerto de Gimhae (Busan)', coords: [35.1796, 129.0756] }
+    };
+    
+    // Función para encontrar la ubicación más cercana según el tipo de transporte
+    function findNearestLocation(coord) {
+        let nearestLocation = '';
+        let minDistance = Infinity;
+        
+        Object.entries(locations).forEach(([key, location]) => {
+            // Filtrar por tipo de transporte
+            if (transportType === 'maritima' && !key.includes('port')) return;
+            if (transportType === 'aerea' && !key.includes('airport')) return;
+            if (transportType === 'terrestre' && key.includes('port')) return;
+            if (transportType === 'terrestre' && key.includes('airport')) return;
+            
+            const distance = Math.sqrt(
+                Math.pow(coord[0] - location.coords[0], 2) + 
+                Math.pow(coord[1] - location.coords[1], 2)
+            );
+            
+            if (distance < minDistance) {
+                minDistance = distance;
+                nearestLocation = location.name;
+            }
+        });
+        
+        return nearestLocation;
+    }
+    
+    const origin = findNearestLocation(originCoord);
+    const destination = findNearestLocation(destinationCoord);
+    
+    return { origin, destination };
+}
+
+// Función para calcular flete marítimo with factor de estiba (FE)
+function calculateMaritimeFreight(grossWeight, volume, cargoDetails) {
+    // Calcular Factor de Estiba (FE = Volumen / Peso)
+    const weightInTons = grossWeight / 1000;
+    const FE = volume / weightInTons;
+    
+    // Tarifas base por tonelada o metro cúbico (según ejemplo original)
+    const tarifaPorToneladaOM3 = 80; // USD por tonelada o m³
+    
+    // Aplicar tarifa por el mayor entre peso y volumen
+    const costoBasePorPeso = weightInTons * tarifaPorToneladaOM3;
+    const costoBasePorVolumen = volume * tarifaPorToneladaOM3;
+    const costoBase = Math.max(costoBasePorPeso, costoBasePorVolumen);
+    
+    // Recargos según ejemplo original
+    const CAF = costoBase * 0.20; // Currency Adjustment Factor (20%)
+    const BAF = (FE > 1 ? volume : weightInTons) * 10; // Bunker Adjustment Factor ($10 por unidad)
+    
+    // Costo total
+    const totalCost = Math.round(costoBase + CAF + BAF);
+    
+    // Generar desglose detallado
+    const breakdown = `
+        <div class="maritime-freight-breakdown">
+            <h5>Desglose del flete marítimo</h5>
+            <div class="freight-details">
+                <p><strong>Datos de la carga:</strong></p>
+                <p>• Peso bruto: ${grossWeight.toLocaleString()} kg (${weightInTons.toFixed(2)} ton)</p>
+                <p>• Volumen: ${volume.toFixed(2)} m³</p>
+                <p>• Factor de Estiba (FE): ${FE.toFixed(2)} m³/ton</p>
+                <br>
+                <p><strong>Cálculo de tarifa:</strong></p>
+                <p>• Por peso: ${weightInTons.toFixed(2)} ton × $${tarifaPorToneladaOM3} = $${costoBasePorPeso.toLocaleString()}</p>
+                <p>• Por volumen: ${volume.toFixed(2)} m³ × $${tarifaPorToneladaOM3} = $${costoBasePorVolumen.toLocaleString()}</p>
+                <p>• <strong>Tarifa base (mayor):</strong> $${costoBase.toLocaleString()}</p>
+                <br>
+                <p><strong>Recargos:</strong></p>
+                <p>• CAF (20%): $${CAF.toLocaleString()}</p>
+                <p>• BAF ($10 × ${FE > 1 ? volume.toFixed(2) + ' m³' : weightInTons.toFixed(2) + ' ton'}): $${BAF.toLocaleString()}</p>
+                <br>
+                <p><strong>Total:</strong> $${totalCost.toLocaleString()}</p>
+            </div>
+        </div>
+    `;
+    
+    return {
+        totalCost: totalCost,
+        breakdown: breakdown,
+        details: {
+            weight: weightInTons,
+            volume: volume,
+            FE: FE,
+            baseCost: costoBase,
+            CAF: CAF,
+            BAF: BAF
+        }
+    };
+}
+
+// Función para crear una ruta curva para aviones
+function createCurvedRoute(coordinates) {
+    if (coordinates.length < 2) return coordinates;
+    
+    const start = coordinates[0];
+    const end = coordinates[coordinates.length - 1];
+    
+    // Calcular el punto medio
+    const midLat = (start[0] + end[0]) / 2;
+    const midLng = (start[1] + end[1]) / 2;
+    
+    // Calcular la distancia entre puntos
+    const distance = Math.sqrt(
+        Math.pow(end[0] - start[0], 2) + 
+        Math.pow(end[1] - start[1], 2)
+    );
+    
+    // Crear un arco elevado para simular la curvatura de la Tierra
+    // La elevación depende de la distancia
+    const elevation = distance * 0.3; // Factor de curvatura
+    
+    // Determinar si vamos hacia el este o hacia el oeste
+    const goingEast = end[1] > start[1];
+    
+    // Crear punto de control para la curva
+    let controlLat, controlLng;
+    
+    if (Math.abs(end[1] - start[1]) > 90) {
+        // Para rutas transcontinentales, elevar hacia el norte
+        controlLat = midLat + elevation;
+        controlLng = midLng;
+    } else {
+        // Para rutas más cortas, crear arco natural
+        controlLat = midLat + elevation * 0.5;
+        controlLng = midLng + (goingEast ? elevation * 0.3 : -elevation * 0.3);
+    }
+    
+    // Generar puntos intermedios para crear una curva suave
+    const curvedPoints = [];
+    const numPoints = 20; // Número de puntos para la curva
+    
+    for (let i = 0; i <= numPoints; i++) {
+        const t = i / numPoints;
+        
+        // Usar interpolación cuadrática de Bézier para crear la curva
+        const lat = Math.pow(1 - t, 2) * start[0] + 
+                   2 * (1 - t) * t * controlLat + 
+                   Math.pow(t, 2) * end[0];
+        
+        const lng = Math.pow(1 - t, 2) * start[1] + 
+                   2 * (1 - t) * t * controlLng + 
+                   Math.pow(t, 2) * end[1];
+        
+        curvedPoints.push([lat, lng]);
+    }
+    
+    return curvedPoints;
 }
 
 // Inicialización cuando se carga la página
 document.addEventListener('DOMContentLoaded', function() {
     // Configurar event listeners
     document.getElementById('routeForm').addEventListener('submit', handleFormSubmit);
-    document.getElementById('cargoType').addEventListener('change', toggleCargoFields);
+    document.getElementById('origin').addEventListener('change', updateDestinationOptions);
+    document.getElementById('destination').addEventListener('change', updateOriginOptions);
+    
+    // Event listener para el botón de calcular costo
+    document.getElementById('calculateCost').addEventListener('click', calculateRouteInfo);
     
     // Verificar si rutasReales está disponible
     if (typeof rutasReales === 'undefined') {
