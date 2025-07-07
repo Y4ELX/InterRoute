@@ -3,74 +3,122 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>InterRoute - Sugerencia de Rutas Internacionales</title>
+    <meta name="description" content="InterRoute - Simulador avanzado de rutas internacionales de envío de mercancías con visualización en tiempo real">
+    <meta name="keywords" content="logística, transporte internacional, rutas de envío, comercio exterior">
+    <meta name="author" content="InterRoute">
+    <title>InterRoute - Rutas Internacionales Inteligentes</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚢</text></svg>">
+    
+    <!-- Preconnect para optimizar carga -->
+    <link rel="preconnect" href="https://unpkg.com">
+    
+    <!-- Estilos -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <header>
+    <header role="banner">
         <h1>InterRoute</h1>
-        <p>Simulador de rutas internacionales de envío de mercancías</p>
+        <p>Simulador inteligente de rutas internacionales de envío</p>
     </header>
-    <main>
-        <section class="form-section">
-            <form id="routeForm">
+    
+    <main role="main">
+        <section class="form-section" aria-labelledby="route-form-title">
+            <h2 id="route-form-title" class="sr-only">Formulario de búsqueda de rutas</h2>
+            <form id="routeForm" novalidate>
                 <div class="form-group">
-                    <label for="origin">Origen</label>
-                    <select id="origin" name="origin" required>
-                        <option value="">Seleccione país</option>
-                        <option value="Mexico">México</option>
-                        <option value="Estados_Unidos">Estados Unidos</option>
-                        <option value="China">China</option>
-                        <option value="Alemania">Alemania</option>
-                        <option value="Paises_Bajos">Países Bajos</option>
-                        <option value="Corea">Corea del Sur</option>
+                    <label for="origin">🏭 País de origen</label>
+                    <select id="origin" name="origin" required aria-describedby="origin-help">
+                        <option value="">Seleccione país de origen</option>
+                        <option value="Mexico">🇲🇽 México</option>
+                        <option value="Estados_Unidos">🇺🇸 Estados Unidos</option>
+                        <option value="China">🇨🇳 China</option>
+                        <option value="Alemania">🇩🇪 Alemania</option>
+                        <option value="Paises_Bajos">🇳🇱 Países Bajos</option>
+                        <option value="Corea">🇰🇷 Corea del Sur</option>
                     </select>
+                    <small id="origin-help" class="help-text">Seleccione el país desde donde enviará la mercancía</small>
                 </div>
+                
                 <div class="form-group">
-                    <label for="destination">Destino</label>
-                    <select id="destination" name="destination" required>
-                        <option value="">Seleccione país</option>
-                        <option value="Mexico">México</option>
-                        <option value="Estados_Unidos">Estados Unidos</option>
-                        <option value="China">China</option>
-                        <option value="Alemania">Alemania</option>
-                        <option value="Paises_Bajos">Países Bajos</option>
-                        <option value="Corea">Corea del Sur</option>
+                    <label for="destination">🎯 País de destino</label>
+                    <select id="destination" name="destination" required aria-describedby="destination-help">
+                        <option value="">Seleccione país de destino</option>
+                        <option value="Mexico">🇲🇽 México</option>
+                        <option value="Estados_Unidos">🇺🇸 Estados Unidos</option>
+                        <option value="China">🇨🇳 China</option>
+                        <option value="Alemania">🇩🇪 Alemania</option>
+                        <option value="Paises_Bajos">🇳🇱 Países Bajos</option>
+                        <option value="Corea">🇰🇷 Corea del Sur</option>
                     </select>
+                    <small id="destination-help" class="help-text">Seleccione el país de destino de la mercancía</small>
                 </div>
-                <button type="submit">Buscar opciones de transporte</button>
+                
+                <button type="submit" class="interactive-element" aria-describedby="submit-help">
+                    <span>🔍 Buscar opciones de transporte</span>
+                </button>
+                <small id="submit-help" class="help-text">Buscar las mejores rutas disponibles entre los países seleccionados</small>
             </form>
         </section>
         
         <!-- Sección de opciones de transporte -->
-        <section id="transportOptions" class="transport-options" style="display:none;">
-            <h2>Opciones de transporte disponibles</h2>
-            <div id="transportButtons"></div>
+        <section id="transportOptions" class="transport-options" style="display:none;" aria-labelledby="transport-options-title">
+            <h2 id="transport-options-title">🚛 Opciones de transporte disponibles</h2>
+            <div id="transportButtons" role="group" aria-label="Opciones de transporte"></div>
         </section>
         
         <!-- Sección de detalles de transporte seleccionado -->
-        <section id="transportDetails" class="transport-details" style="display:none;">
-            <div id="mapContainer" style="height: 400px; margin-bottom: 1rem; border-radius: 8px; overflow: hidden;"></div>
+        <section id="transportDetails" class="transport-details" style="display:none;" aria-labelledby="transport-details-title">
+            <h2 id="transport-details-title" class="sr-only">Detalles del transporte seleccionado</h2>
+            
+            <div id="mapContainer" 
+                 style="height: 400px; margin-bottom: 1rem; border-radius: 16px; overflow: hidden;" 
+                 role="img" 
+                 aria-label="Mapa interactivo mostrando la ruta de transporte seleccionada">
+            </div>
             
             <!-- Opciones de carga específicas por tipo de transporte -->
-            <div id="cargoOptions">
-                <h3>Detalles de la carga</h3>
-                <div id="cargoTypeContainer"></div>
-                <div id="cargoDetailsContainer"></div>
-                <button id="calculateCost" type="button">Calcular costo</button>
+            <div id="cargoOptions" aria-labelledby="cargo-options-title">
+                <h3 id="cargo-options-title">📦 Detalles de la carga</h3>
+                <div id="cargoTypeContainer" role="group" aria-label="Tipo de carga"></div>
+                <div id="cargoDetailsContainer" role="group" aria-label="Detalles específicos de la carga"></div>
+                <button id="calculateCost" type="button" class="button-success interactive-element" aria-describedby="calculate-help">
+                    <span>💰 Calcular costo de envío</span>
+                </button>
+                <small id="calculate-help" class="help-text">Obtenga un presupuesto detallado basado en los datos ingresados</small>
             </div>
             
             <!-- Resultado del cálculo -->
-            <div id="costResult" style="display:none;">
-                <h3>Información de la ruta</h3>
-                <div id="routeInfo"></div>
+            <div id="costResult" style="display:none;" role="region" aria-labelledby="cost-result-title">
+                <h3 id="cost-result-title">📊 Resumen de la ruta y costos</h3>
+                <div id="routeInfo" aria-live="polite"></div>
             </div>
         </section>
     </main>
-    <footer>
-        <p>&copy; 2025 InterRoute</p>
+    
+    <!-- Clase para screen readers -->
+    <style>
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+    </style>
+    
+    <!-- <footer role="contentinfo">
+        <p>&copy; 2025 InterRoute - Soluciones logísticas inteligentes</p>
+        <p>🌍 Conectando el mundo a través del comercio internacional</p>
     </footer>
+     -->
+    <!-- Scripts -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="rutasReales.js"></script>
     <script src="main.js"></script>
