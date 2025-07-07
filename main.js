@@ -69,11 +69,25 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 function calculateRouteDistance(coordinates) {
     if (!coordinates || coordinates.length < 2) return 0;
     
+    // Función auxiliar para extraer coordenadas (manejar tanto arrays como objetos)
+    function extractCoords(coord) {
+        if (Array.isArray(coord)) {
+            return coord;
+        } else if (coord.coords) {
+            return coord.coords;
+        } else {
+            return coord;
+        }
+    }
+    
     let totalDistance = 0;
     for (let i = 0; i < coordinates.length - 1; i++) {
+        const coord1 = extractCoords(coordinates[i]);
+        const coord2 = extractCoords(coordinates[i + 1]);
+        
         totalDistance += calculateDistance(
-            coordinates[i][0], coordinates[i][1],
-            coordinates[i+1][0], coordinates[i+1][1]
+            coord1[0], coord1[1],
+            coord2[0], coord2[1]
         );
     }
     return totalDistance;
@@ -203,6 +217,17 @@ function showRouteOnMap(origin, destination, transportType) {
 function drawRoute(coordinates, color, transportType) {
     if (!coordinates || coordinates.length < 2) return null;
     
+    // Función auxiliar para extraer coordenadas (manejar tanto arrays como objetos)
+    function extractCoords(coord) {
+        if (Array.isArray(coord)) {
+            return coord;
+        } else if (coord.coords) {
+            return coord.coords;
+        } else {
+            return coord;
+        }
+    }
+    
     let routeCoordinates = coordinates;
     let polylineOptions = {
         color: color,
@@ -226,8 +251,11 @@ function drawRoute(coordinates, color, transportType) {
     
     const polyline = L.polyline(routeCoordinates, polylineOptions).addTo(routeLayerGroup);
     
-    // Agregar marcadores de inicio y fin (usar coordenadas originales)
-    const startMarker = L.marker(coordinates[0], {
+    // Agregar marcadores de inicio y fin (usar coordenadas extraídas)
+    const startCoords = extractCoords(coordinates[0]);
+    const endCoords = extractCoords(coordinates[coordinates.length - 1]);
+    
+    const startMarker = L.marker(startCoords, {
         icon: L.divIcon({
             html: '🚀',
             className: 'transport-marker',
@@ -235,7 +263,7 @@ function drawRoute(coordinates, color, transportType) {
         })
     }).addTo(routeLayerGroup);
     
-    const endMarker = L.marker(coordinates[coordinates.length - 1], {
+    const endMarker = L.marker(endCoords, {
         icon: L.divIcon({
             html: '🏁',
             className: 'transport-marker',
@@ -252,13 +280,31 @@ function drawRoute(coordinates, color, transportType) {
     
     if (coordinates.length > 2) {
         const midPoint = Math.floor(coordinates.length / 2);
-        const transportMarker = L.marker(coordinates[midPoint], {
+        const midCoords = extractCoords(coordinates[midPoint]);
+        const transportMarker = L.marker(midCoords, {
             icon: L.divIcon({
                 html: transportIcons[transportType],
                 className: 'animated-marker',
                 iconSize: [30, 30]
             })
         }).addTo(routeLayerGroup);
+    }
+    
+    // Agregar marcadores especiales para puntos estrictos (solo para rutas marítimas)
+    if (transportType === 'maritima') {
+        coordinates.forEach((coord, index) => {
+            if (coord.strict) {
+                const strictCoords = extractCoords(coord);
+                const strictMarker = L.marker(strictCoords, {
+                    icon: L.divIcon({
+                        html: '⚓',
+                        className: 'strict-point-marker',
+                        iconSize: [25, 25]
+                    }),
+                    title: 'Punto estricto - Canal de Panamá'
+                }).addTo(routeLayerGroup);
+            }
+        });
     }
     
     return polyline;
@@ -1054,12 +1100,30 @@ function createCurvedRoute(coordinates) {
 function createMaritimeSpline(coordinates) {
     console.log('createMaritimeSpline called with:', coordinates);
     
+    // Función auxiliar para normalizar coordenadas (manejar tanto arrays como objetos)
+    function normalizeCoordinates(coords) {
+        const normalized = coords.map(coord => {
+            if (Array.isArray(coord)) {
+                return { coords: coord, strict: false };
+            } else if (coord.coords) {
+                return { coords: coord.coords, strict: coord.strict || false };
+            } else {
+                return { coords: coord, strict: false };
+            }
+        });
+        console.log('Normalized coordinates:', normalized);
+        return normalized;
+    }
+    
     if (coordinates.length < 2) return coordinates;
     
+    // Normalizar las coordenadas
+    const normalizedCoords = normalizeCoordinates(coordinates);
+    
     // Si solo hay 2 puntos, crear una línea ligeramente curvada
-    if (coordinates.length === 2) {
-        const start = coordinates[0];
-        const end = coordinates[1];
+    if (normalizedCoords.length === 2) {
+        const start = normalizedCoords[0].coords;
+        const end = normalizedCoords[1].coords;
         
         // Calcular punto medio con una ligera curvatura
         const midLat = (start[0] + end[0]) / 2;
@@ -1085,25 +1149,42 @@ function createMaritimeSpline(coordinates) {
         return result;
     }
     
-    // Para múltiples puntos, crear spline cúbico suave
+    // Para múltiples puntos, crear spline cúbico suave respetando puntos estrictos
     const splinePoints = [];
     const pointsPerSegment = 12; // Puntos por segmento optimizado para suavidad
     
     // Agregar el primer punto
-    splinePoints.push(coordinates[0]);
+    splinePoints.push(normalizedCoords[0].coords);
     
     // Crear spline entre cada par de puntos consecutivos
-    for (let i = 0; i < coordinates.length - 1; i++) {
-        const p0 = i > 0 ? coordinates[i - 1] : coordinates[i];
-        const p1 = coordinates[i];
-        const p2 = coordinates[i + 1];
-        const p3 = i < coordinates.length - 2 ? coordinates[i + 2] : coordinates[i + 1];
+    for (let i = 0; i < normalizedCoords.length - 1; i++) {
+        const currentPoint = normalizedCoords[i];
+        const nextPoint = normalizedCoords[i + 1];
         
-        // Calcular puntos intermedios usando spline cúbico
-        for (let t = 1; t <= pointsPerSegment; t++) {
-            const u = t / pointsPerSegment;
-            const point = catmullRomSpline(p0, p1, p2, p3, u);
-            splinePoints.push(point);
+        // Si el punto actual o el siguiente son estrictos, crear línea recta
+        if (currentPoint.strict || nextPoint.strict) {
+            console.log(`Creating straight line segment from point ${i} to ${i + 1} (strict point detected)`);
+            
+            // Crear línea recta entre los dos puntos
+            for (let t = 1; t <= pointsPerSegment; t++) {
+                const u = t / pointsPerSegment;
+                const lat = currentPoint.coords[0] + (nextPoint.coords[0] - currentPoint.coords[0]) * u;
+                const lng = currentPoint.coords[1] + (nextPoint.coords[1] - currentPoint.coords[1]) * u;
+                splinePoints.push([lat, lng]);
+            }
+        } else {
+            // Crear spline suave normal
+            const p0 = i > 0 ? normalizedCoords[i - 1].coords : normalizedCoords[i].coords;
+            const p1 = normalizedCoords[i].coords;
+            const p2 = normalizedCoords[i + 1].coords;
+            const p3 = i < normalizedCoords.length - 2 ? normalizedCoords[i + 2].coords : normalizedCoords[i + 1].coords;
+            
+            // Calcular puntos intermedios usando spline cúbico
+            for (let t = 1; t <= pointsPerSegment; t++) {
+                const u = t / pointsPerSegment;
+                const point = catmullRomSpline(p0, p1, p2, p3, u);
+                splinePoints.push(point);
+            }
         }
     }
     
